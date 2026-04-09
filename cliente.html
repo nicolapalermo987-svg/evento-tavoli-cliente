@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#8b6914" />
+  <title>Compilazione tavoli cliente</title>
+  <link rel="manifest" href="manifest-client.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Compilazione tavoli cliente</h1>
+      <p class="subtitle">Inserisci tavoli e ospiti. Al termine esporta il JSON e invialo all'organizzatore.</p>
+      <div class="header-row">
+        <label class="field-inline">
+          <span>Nome evento</span>
+          <input type="text" id="eventName" placeholder="Es. Evento Rossi-Bianchi" />
+        </label>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section class="panel panel--data" aria-labelledby="data-heading">
+        <h2 id="data-heading">Tavoli e ospiti</h2>
+        <p class="hint">Massimo <strong>9 persone</strong> per tavolo. Vedi <strong>un tavolo alla volta</strong>: scorri in basso per passare al successivo.</p>
+
+        <div class="toolbar">
+          <button type="button" class="btn btn-primary" id="addTableBtn">+ Aggiungi tavolo</button>
+          <button type="button" class="btn btn-secondary" id="sortTablesBtn">Riordina tavoli 1→N</button>
+          <button type="button" class="btn btn-secondary" id="renumberTablesBtn">Rinumerazione intelligente</button>
+          <span class="table-count" id="tableCountLabel">0 tavoli</span>
+        </div>
+
+        <div class="tables-list" id="tablesList"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>I dati restano nel browser locale. Esporta il JSON e invialo all'organizzatore.</p>
+      <div class="footer-actions">
+        <button type="button" class="btn btn-secondary" id="exportGuestsBtn">Esporta partecipanti A-Z PDF</button>
+        <button type="button" class="btn btn-secondary" id="exportKitchenBtn">Esporta riepilogo cucina PDF</button>
+        <button type="button" class="btn btn-secondary" id="exportBtn">Esporta JSON</button>
+        <label class="btn btn-secondary file-label">
+          Importa JSON
+          <input type="file" id="importInput" accept="application/json,.json" hidden />
+        </label>
+      </div>
+    </footer>
+  </div>
+
+  <template id="tableCardTpl">
+    <article class="table-card" data-table-id="">
+      <div class="table-card__top">
+        <div class="table-card__title-row" aria-label="Intestazione tavolo">
+          <h3 class="table-title"></h3>
+          <input type="text" class="table-custom-name" placeholder="Nome tavolo (opzionale)" maxlength="100" />
+          <input type="text" class="table-note" placeholder="Specifiche / note tavolo (opzionale)" maxlength="220" />
+        </div>
+        <button type="button" class="btn btn-danger btn-sm remove-table" title="Elimina tavolo">Elimina</button>
+      </div>
+      <div class="guests" data-guests></div>
+      <p class="capacity-msg" data-capacity></p>
+      <p class="table-summary" data-summary></p>
+    </article>
+  </template>
+
+  <template id="guestRowTpl">
+    <div class="guest-row">
+      <input type="text" class="guest-cognome" placeholder="Cognome" maxlength="80" />
+      <input type="text" class="guest-nome" placeholder="Nome" maxlength="80" />
+      <select class="guest-menu" aria-label="Tipo menu">
+        <option value="adulto" selected>Menu adulto</option>
+        <option value="bambino">Menu bambino</option>
+      </select>
+      <input type="text" class="guest-note" placeholder="Variazioni / allergie alimentari" maxlength="220" />
+      <button type="button" class="btn btn-ghost btn-sm remove-guest" title="Rimuovi ospite">×</button>
+    </div>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="app-client.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw-client.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
