@@ -776,7 +776,7 @@ body.dropdown-menu-open {
 .floor-stage {
   position: relative;
   line-height: 0;
-  touch-action: none;
+  touch-action: pan-y;
   min-height: 320px;
 }
 
@@ -855,6 +855,7 @@ body.dropdown-menu-open {
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: none;
 }
 
 .table-marker__circle:active {
@@ -917,6 +918,21 @@ body.dropdown-menu-open {
 
   .table-title {
     white-space: normal;
+  }
+
+  /* Su smartphone evitiamo lo scroll annidato: la pagina scorre in modo unico */
+  .tables-list {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+    scroll-snap-type: none;
+    overscroll-behavior: auto;
+  }
+
+  .table-card {
+    scroll-snap-align: none;
+    scroll-snap-stop: normal;
   }
 }
 
