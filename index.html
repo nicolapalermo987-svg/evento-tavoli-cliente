@@ -25,6 +25,10 @@
     <div class="sticky-toolbar" id="stickyToolbar" role="region" aria-label="Azioni rapide tavoli">
       <div class="sticky-toolbar__row">
         <button type="button" class="btn btn-primary" id="addTableBtn">+ Aggiungi tavolo</button>
+        <div class="view-switch" role="group" aria-label="Navigazione aree principali">
+          <button type="button" class="btn btn-secondary view-switch__btn is-active" id="showTablesAreaBtn" aria-pressed="true">Tavoli</button>
+          <button type="button" class="btn btn-secondary view-switch__btn" id="showMapAreaBtn" aria-pressed="false">Piantina</button>
+        </div>
         <div class="dropdown" id="tableActionsDropdown">
           <button
             type="button"
@@ -85,14 +89,14 @@
     <div class="dropdown-backdrop" id="dropdownBackdrop" hidden aria-hidden="true"></div>
 
     <main class="main-grid">
-      <section class="panel panel--data" aria-labelledby="data-heading">
+      <section class="panel panel--data" id="tablesAreaPanel" aria-labelledby="data-heading">
         <h2 id="data-heading">Tavoli e ospiti</h2>
         <p class="hint">Massimo <strong>9 persone</strong> per tavolo. <strong>Cognome</strong> e <strong>nome</strong> affiancati; <strong>⋯</strong> per menù e allergie. Con nome o cognome inserito: <strong>nessun pallino</strong> se adulto senza allergie; <strong>giallo</strong> solo se menù bambino; <strong>rosso</strong> solo se hai scritto un’allergia; <strong>giallo e rosso affiancati</strong> se è bambino e allergico. Scorri per il tavolo successivo.</p>
 
         <div class="tables-list" id="tablesList"></div>
       </section>
 
-      <section class="panel panel--map" aria-labelledby="map-heading">
+      <section class="panel panel--map" id="mapAreaPanel" aria-labelledby="map-heading" hidden>
         <h2 id="map-heading">Piantina della sala</h2>
         <p class="hint">Carica l’immagine della piantina (PNG, JPG). I tavoli compaiono automaticamente: trascinali dove servono. Sotto il numero c’è il conteggio menù (es. 5A+2B); sotto ancora le allergie nello stesso formato del resoconto, senza ripetere il conteggio. Passa col mouse sul tavolo per il riepilogo completo.</p>
 

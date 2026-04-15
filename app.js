@@ -17,6 +17,10 @@ const state = {
 const els = {
   eventName: document.getElementById("eventName"),
   addTableBtn: document.getElementById("addTableBtn"),
+  showTablesAreaBtn: document.getElementById("showTablesAreaBtn"),
+  showMapAreaBtn: document.getElementById("showMapAreaBtn"),
+  tablesAreaPanel: document.getElementById("tablesAreaPanel"),
+  mapAreaPanel: document.getElementById("mapAreaPanel"),
   sortTablesBtn: document.getElementById("sortTablesBtn"),
   renumberTablesBtn: document.getElementById("renumberTablesBtn"),
   tablesList: document.getElementById("tablesList"),
@@ -577,6 +581,24 @@ function toggleDropdown(panel, button) {
       els.dropdownBackdrop.hidden = false;
     }
     document.body.classList.add("dropdown-menu-open");
+  }
+}
+
+function setMainAreaView(view) {
+  const showTables = view !== "map";
+  if (els.tablesAreaPanel) {
+    els.tablesAreaPanel.hidden = !showTables;
+  }
+  if (els.mapAreaPanel) {
+    els.mapAreaPanel.hidden = showTables;
+  }
+  if (els.showTablesAreaBtn) {
+    els.showTablesAreaBtn.classList.toggle("is-active", showTables);
+    els.showTablesAreaBtn.setAttribute("aria-pressed", showTables ? "true" : "false");
+  }
+  if (els.showMapAreaBtn) {
+    els.showMapAreaBtn.classList.toggle("is-active", !showTables);
+    els.showMapAreaBtn.setAttribute("aria-pressed", showTables ? "false" : "true");
   }
 }
 
@@ -2438,6 +2460,18 @@ els.eventName.addEventListener("input", () => {
 
 els.addTableBtn.addEventListener("click", addTable);
 
+if (els.showTablesAreaBtn) {
+  els.showTablesAreaBtn.addEventListener("click", () => {
+    setMainAreaView("tables");
+  });
+}
+
+if (els.showMapAreaBtn) {
+  els.showMapAreaBtn.addEventListener("click", () => {
+    setMainAreaView("map");
+  });
+}
+
 els.sortTablesBtn.addEventListener("click", () => {
   closeAllDropdowns();
   sortTablesAscending();
@@ -2960,6 +2994,7 @@ document.addEventListener("keydown", (e) => {
 
 initSegnatavoloModal();
 loadState();
+setMainAreaView("tables");
 els.eventName.value = state.eventName;
 applyFloorPlanFromState();
 renderTables();

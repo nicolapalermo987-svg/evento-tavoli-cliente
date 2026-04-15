@@ -115,6 +115,13 @@ select:focus {
   gap: 1.5rem;
 }
 
+/* Nasconde testi descrittivi per interfaccia più pulita */
+.header .subtitle,
+.panel .hint,
+.footer {
+  display: none !important;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -186,6 +193,29 @@ select:focus {
   gap: 0.45rem 0.65rem;
   max-width: 1280px;
   margin: 0 auto;
+}
+
+.view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fffcf6;
+}
+
+.view-switch__btn {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  line-height: 1.1;
+}
+
+.view-switch__btn.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .current-table-badge {
