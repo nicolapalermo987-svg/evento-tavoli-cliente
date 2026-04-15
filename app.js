@@ -33,6 +33,7 @@ const els = {
   importDropdown: document.getElementById("importDropdown"),
   importMenuBtn: document.getElementById("importMenuBtn"),
   importMenu: document.getElementById("importMenu"),
+  dropdownBackdrop: document.getElementById("dropdownBackdrop"),
   importJsonBtn: document.getElementById("importJsonBtn"),
   floorPlanInput: document.getElementById("floorPlanInput"),
   clearPlanBtn: document.getElementById("clearPlanBtn"),
@@ -560,6 +561,10 @@ function closeAllDropdowns() {
   if (els.importMenuBtn) {
     els.importMenuBtn.setAttribute("aria-expanded", "false");
   }
+  if (els.dropdownBackdrop) {
+    els.dropdownBackdrop.hidden = true;
+  }
+  document.body.classList.remove("dropdown-menu-open");
 }
 
 function toggleDropdown(panel, button) {
@@ -567,6 +572,12 @@ function toggleDropdown(panel, button) {
   closeAllDropdowns();
   panel.hidden = !willOpen;
   button.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (willOpen) {
+    if (els.dropdownBackdrop) {
+      els.dropdownBackdrop.hidden = false;
+    }
+    document.body.classList.add("dropdown-menu-open");
+  }
 }
 
 /** Testo sotto il marcatore sulla piantina: solo allergie/note tavolo, senza ripetere 5A+2B */
@@ -2462,6 +2473,12 @@ if (els.importJsonBtn && els.importInput) {
   els.importJsonBtn.addEventListener("click", () => {
     closeAllDropdowns();
     els.importInput.click();
+  });
+}
+
+if (els.dropdownBackdrop) {
+  els.dropdownBackdrop.addEventListener("click", () => {
+    closeAllDropdowns();
   });
 }
 
