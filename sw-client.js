@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const CACHE_NAME = "tavoli-cliente-v1";
 const ASSETS = ["./cliente.html", "./app-client.js", "./styles.css", "./manifest-client.json", "./icon-client.svg"];
 
@@ -33,3 +34,40 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+=======
+const CACHE_NAME = "tavoli-cliente-v1";
+const ASSETS = ["./cliente.html", "./app-client.js", "./styles.css", "./manifest-client.json", "./icon-client.svg"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).catch(() => {})
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match("./cliente.html"));
+    })
+  );
+});
+>>>>>>> 5f9a0327b864451f430a2105a0c1caf3fb1316bc
