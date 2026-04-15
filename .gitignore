@@ -1,0 +1,21 @@
+# Dipendenze (se in futuro aggiungi npm)
+node_modules/
+
+# Ambiente / segreti (mai in repository)
+.env
+.env.*
+*.local
+
+# Editor e IDE
+.vscode/
+.idea/
+
+# Sistema operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Log e temporanei
+*.log
+*.tmp
+*.temp

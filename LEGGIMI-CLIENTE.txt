@@ -1,0 +1,29 @@
+VERSIONE CLIENTE - USO SEMPLICE (PC E SMARTPHONE)
+
+File da inviare al cliente:
+- cliente.html
+- app-client.js
+- styles.css
+- manifest-client.json
+- sw-client.js
+- icon-client.svg
+
+COME USARLO SU SMARTPHONE (consigliato)
+1) Carica questi file su un hosting statico (es. Netlify Drop o Cloudflare Pages).
+2) Invia al cliente il link pubblico HTTPS.
+3) Il cliente apre il link dal telefono.
+4) Può aggiungerlo alla Home:
+   - Android (Chrome): menu -> "Aggiungi a schermata Home"
+   - iPhone (Safari): Condividi -> "Aggiungi alla schermata Home"
+
+FLUSSO OPERATIVO
+1) Il cliente compila tavoli e ospiti.
+2) Il cliente clicca "Esporta JSON".
+3) Ti invia il file "evento-tavoli.json".
+4) Tu apri la versione completa (index.html) e fai "Importa JSON".
+5) Completi la piantina e le posizioni tavoli.
+
+NOTE IMPORTANTI
+- Questa versione cliente NON mostra la piantina.
+- Il JSON esportato e' compatibile con la versione completa.
+- Se il cliente cambia telefono/browser senza esportare, i dati locali non si trasferiscono da soli.

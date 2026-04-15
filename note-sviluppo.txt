@@ -1,0 +1,53 @@
+================================================================================
+EVENTO TAVOLI — Note di sviluppo (da aggiornare a mano)
+================================================================================
+Questo file è TUO: incolla qui decisioni, bug risolti e promemoria dalla chat
+Cursor, così non dipendi solo dalla cronologia dell’AI. Se usi Git, includilo
+nei commit quando cambia qualcosa di importante.
+
+--------------------------------------------------------------------------------
+OBIETTIVO DEL PROGETTO (breve)
+--------------------------------------------------------------------------------
+(es. App per gestire tavoli e ospiti per un evento; admin su index.html,
+ vista cliente su cliente.html + PWA…)
+
+
+--------------------------------------------------------------------------------
+DECISIONI IMPORTANTI
+--------------------------------------------------------------------------------
+- Data | Cosa abbiamo scelto e perché
+-
+
+
+--------------------------------------------------------------------------------
+COSA SAPERE (file / funzioni chiave)
+--------------------------------------------------------------------------------
+- app.js          → logica principale organizzatore
+- app-client.js   → vista cliente
+- index.html / cliente.html
+- styles.css
+- SETUP-GIT.txt   → primo collegamento a GitHub
+
+
+--------------------------------------------------------------------------------
+BUG / COMPORTAMENTO — promemoria
+--------------------------------------------------------------------------------
+- (es.) Pallini ospiti: .guest-dot[hidden] serve perché display:block annulla hidden
+-
+
+
+--------------------------------------------------------------------------------
+DA FARE / IDEe
+--------------------------------------------------------------------------------
+-
+
+
+--------------------------------------------------------------------------------
+APPUNTI LIBERI (incolla qui pezzi utili dalle chat)
+--------------------------------------------------------------------------------
+
+
+
+================================================================================
+Fine — modifica le sezioni come preferisci
+================================================================================
