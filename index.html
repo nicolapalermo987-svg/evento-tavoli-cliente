@@ -28,6 +28,7 @@
         <div class="view-switch" role="group" aria-label="Navigazione aree principali">
           <button type="button" class="btn btn-secondary view-switch__btn is-active" id="showTablesAreaBtn" aria-pressed="true">Tavoli</button>
           <button type="button" class="btn btn-secondary view-switch__btn" id="showMapAreaBtn" aria-pressed="false">Piantina</button>
+          <button type="button" class="btn btn-secondary view-switch__btn" id="showAcceptanceAreaBtn" aria-pressed="false">Accettazione</button>
         </div>
         <div class="dropdown" id="tableActionsDropdown">
           <button
@@ -116,6 +117,25 @@
               <p class="small">Carica la piantina della sala oppure usa solo l’area grigia per posizionare i tavoli.</p>
             </div>
             <div class="floor-markers" id="floorMarkers"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel--acceptance" id="acceptanceAreaPanel" aria-labelledby="acceptance-heading" hidden>
+        <h2 id="acceptance-heading">Accettazione</h2>
+        <div class="acceptance-search-wrap">
+          <input
+            type="text"
+            id="acceptanceSearchInput"
+            class="acceptance-search-input"
+            placeholder="Cerca per cognome, nome o tavolo..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="acceptance-layout">
+          <div class="acceptance-results" id="acceptanceResults" aria-live="polite"></div>
+          <div class="acceptance-table-preview" id="acceptanceTablePreview">
+            <p class="acceptance-empty">Seleziona un partecipante per vedere il tavolo completo.</p>
           </div>
         </div>
       </section>

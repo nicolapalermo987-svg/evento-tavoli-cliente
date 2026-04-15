@@ -14,13 +14,23 @@ const state = {
   markerPositions: {},
 };
 
+const acceptanceUiState = {
+  query: "",
+  selectedTableId: "",
+};
+
 const els = {
   eventName: document.getElementById("eventName"),
   addTableBtn: document.getElementById("addTableBtn"),
   showTablesAreaBtn: document.getElementById("showTablesAreaBtn"),
   showMapAreaBtn: document.getElementById("showMapAreaBtn"),
+  showAcceptanceAreaBtn: document.getElementById("showAcceptanceAreaBtn"),
   tablesAreaPanel: document.getElementById("tablesAreaPanel"),
   mapAreaPanel: document.getElementById("mapAreaPanel"),
+  acceptanceAreaPanel: document.getElementById("acceptanceAreaPanel"),
+  acceptanceSearchInput: document.getElementById("acceptanceSearchInput"),
+  acceptanceResults: document.getElementById("acceptanceResults"),
+  acceptanceTablePreview: document.getElementById("acceptanceTablePreview"),
   sortTablesBtn: document.getElementById("sortTablesBtn"),
   renumberTablesBtn: document.getElementById("renumberTablesBtn"),
   tablesList: document.getElementById("tablesList"),
@@ -261,6 +271,7 @@ function updateGuest(tableId, index, field, value) {
   saveState();
   refreshTableLiveInfoById(tableId);
   renderFloorMarkers();
+  renderAcceptanceArea();
 }
 
 function updateTableMeta(tableId, field, value) {
@@ -269,6 +280,7 @@ function updateTableMeta(tableId, field, value) {
   table[field] = value;
   saveState();
   renderFloorMarkers();
+  renderAcceptanceArea();
 }
 
 function guestDisplayName(guest, fallbackIndex) {
@@ -585,20 +597,30 @@ function toggleDropdown(panel, button) {
 }
 
 function setMainAreaView(view) {
-  const showTables = view !== "map";
+  const targetView = view === "map" || view === "acceptance" ? view : "tables";
   if (els.tablesAreaPanel) {
-    els.tablesAreaPanel.hidden = !showTables;
+    els.tablesAreaPanel.hidden = targetView !== "tables";
   }
   if (els.mapAreaPanel) {
-    els.mapAreaPanel.hidden = showTables;
+    els.mapAreaPanel.hidden = targetView !== "map";
+  }
+  if (els.acceptanceAreaPanel) {
+    els.acceptanceAreaPanel.hidden = targetView !== "acceptance";
   }
   if (els.showTablesAreaBtn) {
-    els.showTablesAreaBtn.classList.toggle("is-active", showTables);
-    els.showTablesAreaBtn.setAttribute("aria-pressed", showTables ? "true" : "false");
+    const isActive = targetView === "tables";
+    els.showTablesAreaBtn.classList.toggle("is-active", isActive);
+    els.showTablesAreaBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
   }
   if (els.showMapAreaBtn) {
-    els.showMapAreaBtn.classList.toggle("is-active", !showTables);
-    els.showMapAreaBtn.setAttribute("aria-pressed", showTables ? "false" : "true");
+    const isActive = targetView === "map";
+    els.showMapAreaBtn.classList.toggle("is-active", isActive);
+    els.showMapAreaBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
+  if (els.showAcceptanceAreaBtn) {
+    const isActive = targetView === "acceptance";
+    els.showAcceptanceAreaBtn.classList.toggle("is-active", isActive);
+    els.showAcceptanceAreaBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
   }
 }
 
@@ -659,6 +681,107 @@ function getSortedParticipants() {
     return k1.localeCompare(k2, "it");
   });
   return rows;
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").trim().toLocaleLowerCase("it");
+}
+
+function renderAcceptanceArea() {
+  if (!els.acceptanceResults || !els.acceptanceTablePreview) return;
+  const query = normalizeSearchText(acceptanceUiState.query);
+  const rows = [];
+  state.tables.forEach((table) => {
+    const tableName = (table.customName || "").trim();
+    const tableLabel = tableName ? `Tavolo ${table.number} — ${tableName}` : `Tavolo ${table.number}`;
+    table.guests.forEach((g) => {
+      const cognome = String(g.cognome || "").trim();
+      const nome = String(g.nome || "").trim();
+      if (!cognome && !nome) return;
+      const fullName = `${cognome} ${nome}`.trim();
+      rows.push({
+        fullName,
+        cognome,
+        nome,
+        tableId: table.id,
+        tableLabel,
+      });
+    });
+  });
+  rows.sort((a, b) => a.fullName.localeCompare(b.fullName, "it", { sensitivity: "base" }));
+
+  const filtered = query
+    ? rows.filter((row) => normalizeSearchText(`${row.fullName} ${row.tableLabel}`).includes(query))
+    : rows;
+
+  els.acceptanceResults.innerHTML = "";
+  if (!filtered.length) {
+    const empty = document.createElement("p");
+    empty.className = "acceptance-empty";
+    empty.textContent = "Nessun risultato per la ricerca.";
+    els.acceptanceResults.appendChild(empty);
+  } else {
+    filtered.forEach((row) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "acceptance-result-item";
+      btn.dataset.tableId = row.tableId;
+      const isActive = acceptanceUiState.selectedTableId === row.tableId;
+      if (isActive) btn.classList.add("is-active");
+      btn.innerHTML = `<strong>${row.fullName}</strong><span>${row.tableLabel}</span>`;
+      btn.addEventListener("click", () => {
+        acceptanceUiState.selectedTableId = row.tableId;
+        renderAcceptanceArea();
+      });
+      els.acceptanceResults.appendChild(btn);
+    });
+  }
+
+  const validSelected = state.tables.some((t) => t.id === acceptanceUiState.selectedTableId);
+  if (!validSelected) {
+    acceptanceUiState.selectedTableId = filtered[0] ? filtered[0].tableId : "";
+  }
+  const selectedTable = state.tables.find((t) => t.id === acceptanceUiState.selectedTableId);
+  els.acceptanceTablePreview.innerHTML = "";
+  if (!selectedTable) {
+    const empty = document.createElement("p");
+    empty.className = "acceptance-empty";
+    empty.textContent = "Seleziona un partecipante per vedere il tavolo completo.";
+    els.acceptanceTablePreview.appendChild(empty);
+    return;
+  }
+
+  const title = document.createElement("h3");
+  const customName = String(selectedTable.customName || "").trim();
+  title.className = "acceptance-preview-title";
+  title.textContent = customName
+    ? `Tavolo ${selectedTable.number} — ${customName}`
+    : `Tavolo ${selectedTable.number}`;
+
+  const summary = document.createElement("p");
+  summary.className = "acceptance-preview-summary";
+  summary.textContent = getTableSummaryLine(selectedTable);
+
+  const list = document.createElement("ol");
+  list.className = "acceptance-preview-list";
+  getActiveGuests(selectedTable).forEach((guest) => {
+    const li = document.createElement("li");
+    const fullName = `${String(guest.cognome || "").trim()} ${String(guest.nome || "").trim()}`.trim();
+    const menuLabel = guest.menu === "bambino" ? "Bambino" : "Adulto";
+    const note = String(guest.note || "").trim();
+    li.innerHTML = `<span>${fullName}</span><small>${menuLabel}${note ? ` • ${note}` : ""}</small>`;
+    list.appendChild(li);
+  });
+  if (!list.children.length) {
+    const li = document.createElement("li");
+    li.className = "acceptance-empty";
+    li.textContent = "Nessun partecipante inserito in questo tavolo.";
+    list.appendChild(li);
+  }
+
+  els.acceptanceTablePreview.appendChild(title);
+  els.acceptanceTablePreview.appendChild(summary);
+  els.acceptanceTablePreview.appendChild(list);
 }
 
 function renderTables() {
@@ -838,6 +961,7 @@ function renderTables() {
   }
 
   updateCurrentTableContextUi();
+  renderAcceptanceArea();
   requestAnimationFrame(() => {
     updateCurrentTableContextUi();
   });
@@ -2469,6 +2593,22 @@ if (els.showTablesAreaBtn) {
 if (els.showMapAreaBtn) {
   els.showMapAreaBtn.addEventListener("click", () => {
     setMainAreaView("map");
+  });
+}
+
+if (els.showAcceptanceAreaBtn) {
+  els.showAcceptanceAreaBtn.addEventListener("click", () => {
+    setMainAreaView("acceptance");
+    if (els.acceptanceSearchInput) {
+      els.acceptanceSearchInput.focus();
+    }
+  });
+}
+
+if (els.acceptanceSearchInput) {
+  els.acceptanceSearchInput.addEventListener("input", () => {
+    acceptanceUiState.query = els.acceptanceSearchInput.value;
+    renderAcceptanceArea();
   });
 }
 
