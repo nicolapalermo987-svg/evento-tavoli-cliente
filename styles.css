@@ -11,6 +11,7 @@
   --shadow: 0 8px 32px rgba(44, 38, 32, 0.08);
   --font-ui: "Source Sans 3", system-ui, sans-serif;
   --font-display: "Cormorant Garamond", Georgia, serif;
+  --area-nav-height: 58px;
   /* Altezza dell’area scroll “Tavoli e ospiti”: un tavolo = un riquadro intero */
   --tables-scroll-height: clamp(380px, calc(100vh - 14rem), 920px);
 }
@@ -19,6 +20,11 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Garantisce che gli elementi con attributo hidden siano davvero nascosti */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -35,7 +41,7 @@ body {
 .app {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 1.5rem;
+  padding: calc(1.5rem + var(--area-nav-height)) 1.25rem 1.5rem;
 }
 
 .header {
@@ -174,9 +180,34 @@ select:focus {
   border: 0;
 }
 
+.area-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 95;
+  height: var(--area-nav-height);
+  display: flex;
+  align-items: center;
+  padding: 0.45rem 0.8rem;
+  background: rgba(248, 246, 243, 0.98);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(44, 38, 32, 0.09);
+}
+
+.area-nav__row {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
 .sticky-toolbar {
   position: sticky;
-  top: 0;
+  top: var(--area-nav-height);
   z-index: 60;
   margin: 0 -1.25rem 1.25rem;
   padding: 0.55rem 1.25rem;
@@ -195,20 +226,12 @@ select:focus {
   margin: 0 auto;
 }
 
-.view-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #fffcf6;
-}
-
 .view-switch__btn {
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.84rem;
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
   line-height: 1.1;
 }
 
@@ -329,8 +352,7 @@ select:focus {
 .dropdown-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(30, 25, 20, 0.42);
-  backdrop-filter: blur(1px);
+  background: rgba(30, 25, 20, 0.24);
   z-index: 110;
 }
 
@@ -1049,6 +1071,10 @@ body.dropdown-menu-open {
 
   .acceptance-results {
     max-height: 46vh;
+  }
+
+  :root {
+    --area-nav-height: 54px;
   }
 }
 

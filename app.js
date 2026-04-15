@@ -21,6 +21,7 @@ const acceptanceUiState = {
 
 const els = {
   eventName: document.getElementById("eventName"),
+  stickyToolbar: document.getElementById("stickyToolbar"),
   addTableBtn: document.getElementById("addTableBtn"),
   showTablesAreaBtn: document.getElementById("showTablesAreaBtn"),
   showMapAreaBtn: document.getElementById("showMapAreaBtn"),
@@ -598,8 +599,10 @@ function toggleDropdown(panel, button) {
 
 function setMainAreaView(view) {
   const targetView = view === "map" || view === "acceptance" ? view : "tables";
+  const showTables = targetView === "tables";
+  closeAllDropdowns();
   if (els.tablesAreaPanel) {
-    els.tablesAreaPanel.hidden = targetView !== "tables";
+    els.tablesAreaPanel.hidden = !showTables;
   }
   if (els.mapAreaPanel) {
     els.mapAreaPanel.hidden = targetView !== "map";
@@ -607,8 +610,11 @@ function setMainAreaView(view) {
   if (els.acceptanceAreaPanel) {
     els.acceptanceAreaPanel.hidden = targetView !== "acceptance";
   }
+  if (els.stickyToolbar) {
+    els.stickyToolbar.hidden = !showTables;
+  }
   if (els.showTablesAreaBtn) {
-    const isActive = targetView === "tables";
+    const isActive = showTables;
     els.showTablesAreaBtn.classList.toggle("is-active", isActive);
     els.showTablesAreaBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
   }

@@ -22,14 +22,17 @@
       </div>
     </header>
 
+    <div class="area-nav" role="region" aria-label="Navigazione aree principali">
+      <div class="area-nav__row">
+        <button type="button" class="btn btn-secondary view-switch__btn is-active" id="showTablesAreaBtn" aria-pressed="true">Tavoli</button>
+        <button type="button" class="btn btn-secondary view-switch__btn" id="showMapAreaBtn" aria-pressed="false">Piantina</button>
+        <button type="button" class="btn btn-secondary view-switch__btn" id="showAcceptanceAreaBtn" aria-pressed="false">Accettazione</button>
+      </div>
+    </div>
+
     <div class="sticky-toolbar" id="stickyToolbar" role="region" aria-label="Azioni rapide tavoli">
       <div class="sticky-toolbar__row">
         <button type="button" class="btn btn-primary" id="addTableBtn">+ Aggiungi tavolo</button>
-        <div class="view-switch" role="group" aria-label="Navigazione aree principali">
-          <button type="button" class="btn btn-secondary view-switch__btn is-active" id="showTablesAreaBtn" aria-pressed="true">Tavoli</button>
-          <button type="button" class="btn btn-secondary view-switch__btn" id="showMapAreaBtn" aria-pressed="false">Piantina</button>
-          <button type="button" class="btn btn-secondary view-switch__btn" id="showAcceptanceAreaBtn" aria-pressed="false">Accettazione</button>
-        </div>
         <div class="dropdown" id="tableActionsDropdown">
           <button
             type="button"
