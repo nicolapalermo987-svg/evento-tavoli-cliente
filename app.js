@@ -34,6 +34,9 @@ const gridPlanState = {
   pendingNodeAction: "",
   firstSelectedNode: null,
   activeCell: null,
+  a4Orientation: "portrait",
+  zoom: 1,
+  pendingAddTilesAnchor: null,
 };
 
 const sketchPlanState = {
@@ -96,6 +99,14 @@ const els = {
   planNodePickerTitle: document.getElementById("planNodePickerTitle"),
   planNodePickerGrid: document.getElementById("planNodePickerGrid"),
   planNodePickerCloseBtn: document.getElementById("planNodePickerCloseBtn"),
+  planAddTilesDialog: document.getElementById("planAddTilesDialog"),
+  planAddTileSizeXInput: document.getElementById("planAddTileSizeXInput"),
+  planAddTileSizeYInput: document.getElementById("planAddTileSizeYInput"),
+  planAddTilesWidthInput: document.getElementById("planAddTilesWidthInput"),
+  planAddTilesHeightInput: document.getElementById("planAddTilesHeightInput"),
+  planAddTilesDirectionSelect: document.getElementById("planAddTilesDirectionSelect"),
+  planAddTilesCancelBtn: document.getElementById("planAddTilesCancelBtn"),
+  planAddTilesApplyBtn: document.getElementById("planAddTilesApplyBtn"),
   planEditorModal: document.getElementById("planEditorModal"),
   planEditorBackdrop: document.getElementById("planEditorBackdrop"),
   planEditorCloseBtn: document.getElementById("planEditorCloseBtn"),
@@ -103,7 +114,14 @@ const els = {
   planA4Sheet: document.getElementById("planA4Sheet"),
   planEditor: document.getElementById("planEditor"),
   planSetupPanel: document.getElementById("planSetupPanel"),
+  planSetupStepTileSize: document.getElementById("planSetupStepTileSize"),
+  planSetupStepTilesCount: document.getElementById("planSetupStepTilesCount"),
   planSetupGenerateBtn: document.getElementById("planSetupGenerateBtn"),
+  planSetupDrawGridLandscapeBtn: document.getElementById("planSetupDrawGridLandscapeBtn"),
+  planSetupDrawGridPortraitBtn: document.getElementById("planSetupDrawGridPortraitBtn"),
+  planZoomOutBtn: document.getElementById("planZoomOutBtn"),
+  planZoomResetBtn: document.getElementById("planZoomResetBtn"),
+  planZoomInBtn: document.getElementById("planZoomInBtn"),
   planEditorBody: document.getElementById("planEditorBody"),
   planEditorStatus: document.getElementById("planEditorStatus"),
   exportPlanPdfBtn: document.getElementById("exportPlanPdfBtn"),
@@ -794,16 +812,22 @@ function setPlanEditorScreen(screen) {
   if (els.planEditorBody) els.planEditorBody.hidden = screen !== "editor";
   if (screen === "editor") {
     requestAnimationFrame(() => {
+      fitPlanSheetIntoStage();
       fitPlanGridIntoA4();
       renderPlanGrid();
     });
   }
 }
 
+function setPlanSetupStep(step) {
+  if (els.planSetupStepTileSize) els.planSetupStepTileSize.hidden = step !== "tile-size";
+  if (els.planSetupStepTilesCount) els.planSetupStepTilesCount.hidden = step !== "tiles-count";
+}
+
 function renderPlanGrid() {
   if (!els.planGrid) return;
   els.planGrid.innerHTML = "";
-  els.planGrid.style.gridTemplateColumns = `repeat(${Math.max(1, gridPlanState.cols)}, var(--plan-cell-size, 26px))`;
+  els.planGrid.style.gridTemplateColumns = `repeat(${Math.max(1, gridPlanState.cols)}, var(--plan-cell-width, 26px))`;
   const frag = document.createDocumentFragment();
   for (let y = 0; y < gridPlanState.rows; y += 1) {
     for (let x = 0; x < gridPlanState.cols; x += 1) {
@@ -831,19 +855,21 @@ function renderPlanGrid() {
 
 function renderPlanOverlay() {
   if (!els.planOverlay) return;
-  const cellSize = Number.parseFloat(getComputedStyle(els.planGrid).getPropertyValue("--plan-cell-size")) || 26;
+  const styles = getComputedStyle(els.planGrid);
+  const cellW = Number.parseFloat(styles.getPropertyValue("--plan-cell-width")) || 26;
+  const cellH = Number.parseFloat(styles.getPropertyValue("--plan-cell-height")) || 26;
   const gap = 0;
-  const width = gridPlanState.cols * cellSize + Math.max(0, gridPlanState.cols - 1) * gap;
-  const height = gridPlanState.rows * cellSize + Math.max(0, gridPlanState.rows - 1) * gap;
+  const width = gridPlanState.cols * cellW + Math.max(0, gridPlanState.cols - 1) * gap;
+  const height = gridPlanState.rows * cellH + Math.max(0, gridPlanState.rows - 1) * gap;
   els.planOverlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
   els.planOverlay.innerHTML = "";
 
   gridPlanState.segments.forEach((seg) => {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", String(nodeToPixel(seg.a.x, seg.a.nx, cellSize, gap)));
-    line.setAttribute("y1", String(nodeToPixel(seg.a.y, seg.a.ny, cellSize, gap)));
-    line.setAttribute("x2", String(nodeToPixel(seg.b.x, seg.b.nx, cellSize, gap)));
-    line.setAttribute("y2", String(nodeToPixel(seg.b.y, seg.b.ny, cellSize, gap)));
+    line.setAttribute("x1", String(nodeToPixel(seg.a.x, seg.a.nx, cellW, gap)));
+    line.setAttribute("y1", String(nodeToPixel(seg.a.y, seg.a.ny, cellH, gap)));
+    line.setAttribute("x2", String(nodeToPixel(seg.b.x, seg.b.nx, cellW, gap)));
+    line.setAttribute("y2", String(nodeToPixel(seg.b.y, seg.b.ny, cellH, gap)));
     line.setAttribute("class", "plan-segment");
     line.dataset.segmentId = seg.id;
     els.planOverlay.appendChild(line);
@@ -851,8 +877,8 @@ function renderPlanOverlay() {
 
   if (gridPlanState.firstSelectedNode) {
     const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    marker.setAttribute("cx", String(nodeToPixel(gridPlanState.firstSelectedNode.x, gridPlanState.firstSelectedNode.nx, cellSize, gap)));
-    marker.setAttribute("cy", String(nodeToPixel(gridPlanState.firstSelectedNode.y, gridPlanState.firstSelectedNode.ny, cellSize, gap)));
+    marker.setAttribute("cx", String(nodeToPixel(gridPlanState.firstSelectedNode.x, gridPlanState.firstSelectedNode.nx, cellW, gap)));
+    marker.setAttribute("cy", String(nodeToPixel(gridPlanState.firstSelectedNode.y, gridPlanState.firstSelectedNode.ny, cellH, gap)));
     marker.setAttribute("r", "6");
     marker.setAttribute("class", "plan-node-highlight");
     els.planOverlay.appendChild(marker);
@@ -860,12 +886,13 @@ function renderPlanOverlay() {
 }
 
 function nodeToPixel(cellIndex, nodeIndex, cellSize, gap) {
-  return cellIndex * (cellSize + gap) + (nodeIndex / 9) * cellSize;
+  return cellIndex * (cellSize + gap) + (nodeIndex / 10) * cellSize;
 }
 
 function hidePlanMenus() {
   if (els.planCellMenu) els.planCellMenu.hidden = true;
   if (els.planNodePicker) els.planNodePicker.hidden = true;
+  if (els.planAddTilesDialog) els.planAddTilesDialog.hidden = true;
 }
 
 function openPlanCellMenu(x, y, clientX, clientY) {
@@ -881,15 +908,24 @@ function openNodePicker(action, clientX, clientY) {
   if (!els.planNodePicker || !els.planNodePickerGrid || !gridPlanState.activeCell) return;
   hidePlanMenus();
   gridPlanState.pendingNodeAction = action;
+  const activeTile = getPlanCellType(gridPlanState.activeCell.x, gridPlanState.activeCell.y);
+  const ratioX = Math.max(0.05, Number(activeTile?.tileSizeX || gridPlanState.tileSizeX || 1));
+  const ratioY = Math.max(0.05, Number(activeTile?.tileSizeY || gridPlanState.tileSizeY || 1));
+  const base = 18;
+  const scale = Math.min(2.4, Math.max(0.45, 1 / Math.max(ratioX, ratioY)));
+  const nodeW = Math.max(8, Math.round(base * ratioX * scale));
+  const nodeH = Math.max(8, Math.round(base * ratioY * scale));
+  els.planNodePickerGrid.style.setProperty("--plan-node-cell-w", `${nodeW}px`);
+  els.planNodePickerGrid.style.setProperty("--plan-node-cell-h", `${nodeH}px`);
   els.planNodePickerTitle.textContent =
     action === "add-tiles"
       ? "Scegli il nodo di ancoraggio"
       : action === "label"
         ? "Scegli il nodo dove ancorare il testo"
-        : "Scegli un nodo 10x10";
+        : "Scegli un nodo 11x11";
   els.planNodePickerGrid.innerHTML = "";
-  for (let ny = 0; ny < 10; ny += 1) {
-    for (let nx = 0; nx < 10; nx += 1) {
+  for (let ny = 0; ny <= 10; ny += 1) {
+    for (let nx = 0; nx <= 10; nx += 1) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "plan-node-picker__node";
@@ -913,7 +949,7 @@ function commitNodeSelection(nx, ny) {
     return;
   }
   if (gridPlanState.pendingNodeAction === "add-tiles") {
-    addTilesFromNodeSelection(cell, nx, ny);
+    openAddTilesDialog(cell, nx, ny);
     return;
   }
   const node = { x: cell.x, y: cell.y, nx, ny };
@@ -947,73 +983,67 @@ function commitNodeSelection(nx, ny) {
   }
 }
 
-function addTilesFromNodeSelection(cell, nx, ny) {
-  const tileSizeValue = window.prompt("Dimensione nuova mattonella (numero):", String(gridPlanState.tileSize));
-  if (tileSizeValue == null) {
-    hidePlanMenus();
-    return;
-  }
-  const tileSize = Math.max(0.1, Number(tileSizeValue));
-  if (!Number.isFinite(tileSize)) {
-    setPlanEditorStatus("Dimensione mattonella non valida.", true);
-    hidePlanMenus();
-    return;
-  }
+function openAddTilesDialog(cell, nx, ny) {
+  if (!els.planAddTilesDialog) return;
+  gridPlanState.pendingAddTilesAnchor = { cell, nx, ny };
+  if (els.planAddTileSizeXInput) els.planAddTileSizeXInput.value = String(gridPlanState.tileSizeX);
+  if (els.planAddTileSizeYInput) els.planAddTileSizeYInput.value = String(gridPlanState.tileSizeY);
+  if (els.planAddTilesWidthInput) els.planAddTilesWidthInput.value = "3";
+  if (els.planAddTilesHeightInput) els.planAddTilesHeightInput.value = "5";
+  if (els.planAddTilesDirectionSelect) els.planAddTilesDirectionSelect.value = "destra";
+  els.planAddTilesDialog.hidden = false;
+  els.planAddTilesDialog.style.left = `${Math.max(8, window.innerWidth / 2 - 200)}px`;
+  els.planAddTilesDialog.style.top = `${Math.max(8, window.innerHeight / 2 - 140)}px`;
+}
 
-  const sizeValue = window.prompt("Dimensioni della tabella da aggiungere (esempio 3x5):", "3x5");
-  if (sizeValue == null) {
-    hidePlanMenus();
-    return;
-  }
-  const match = String(sizeValue).trim().match(/^(\d+)\s*x\s*(\d+)$/i);
-  if (!match) {
-    setPlanEditorStatus("Formato dimensioni non valido. Usa ad esempio 3x5.", true);
-    hidePlanMenus();
-    return;
-  }
-  const width = Math.max(1, Number(match[1]));
-  const height = Math.max(1, Number(match[2]));
-
-  const dirLabel = window.prompt(
-    "Direzione: sinistra/alto, sinistra/basso, destra/alto, destra/basso, alto/destra, basso/sinistra, basso/destra",
-    "destra/basso"
-  );
-  if (dirLabel == null) {
-    hidePlanMenus();
-    return;
-  }
-
-  const direction = String(dirLabel).trim().toLowerCase();
-  const directions = {
-    "sinistra/alto": { sx: -1, sy: -1 },
-    "sinistra/basso": { sx: -1, sy: 0 },
-    "destra/alto": { sx: 0, sy: -1 },
-    "destra/basso": { sx: 0, sy: 0 },
-    "alto/destra": { sx: 0, sy: -1 },
-    "basso/sinistra": { sx: -1, sy: 0 },
-    "basso/destra": { sx: 0, sy: 0 },
+function applyAddTilesFromDialog() {
+  const anchor = gridPlanState.pendingAddTilesAnchor;
+  if (!anchor) return;
+  const tileSizeX = Math.max(0.1, Number(els.planAddTileSizeXInput?.value || gridPlanState.tileSizeX));
+  const tileSizeY = Math.max(0.1, Number(els.planAddTileSizeYInput?.value || gridPlanState.tileSizeY));
+  const width = Math.max(1, Math.round(Number(els.planAddTilesWidthInput?.value || 1)));
+  const height = Math.max(1, Math.round(Number(els.planAddTilesHeightInput?.value || 1)));
+  const direction = String(els.planAddTilesDirectionSelect?.value || "destra");
+  const directionMap = {
+    alto: { xMode: "align", yMode: "before" },
+    basso: { xMode: "align", yMode: "after" },
+    sinistra: { xMode: "before", yMode: "align" },
+    destra: { xMode: "after", yMode: "align" },
+    "alto/sinistra": { xMode: "before", yMode: "before" },
+    "alto/destra": { xMode: "after", yMode: "before" },
+    "basso/sinistra": { xMode: "before", yMode: "after" },
+    "basso/destra": { xMode: "after", yMode: "after" },
   };
-  const anchor = directions[direction];
-  if (!anchor) {
+  const map = directionMap[direction];
+  if (!map) {
     setPlanEditorStatus("Direzione non valida.", true);
-    hidePlanMenus();
     return;
   }
 
-  const startX = cell.x + anchor.sx * (width - 1);
-  const startY = cell.y + anchor.sy * (height - 1);
+  const { cell, nx, ny } = anchor;
+  const startX =
+    map.xMode === "before" ? cell.x - width : map.xMode === "after" ? cell.x + 1 : cell.x;
+  const startY =
+    map.yMode === "before" ? cell.y - height : map.yMode === "after" ? cell.y + 1 : cell.y;
+
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const px = startX + x;
       const py = startY + y;
-      gridPlanState.cells.set(planCellKey(px, py), createPlanTileData(tileSize, tileSize));
+      gridPlanState.cells.set(planCellKey(px, py), createPlanTileData(tileSizeX, tileSizeY));
     }
   }
-  gridPlanState.tileSize = tileSize;
+
+  gridPlanState.tileSize = tileSizeX;
+  gridPlanState.tileSizeX = tileSizeX;
+  gridPlanState.tileSizeY = tileSizeY;
   rebuildPlanBounds();
   hidePlanMenus();
   renderPlanGrid();
-  setPlanEditorStatus(`Aggiunte ${width}x${height} mattonelle verso ${direction}. Nodo scelto: ${nx + 1}/${ny + 1}.`);
+  setPlanEditorStatus(
+    `Aggiunte ${width}x${height} mattonelle (${tileSizeX.toFixed(2)}x${tileSizeY.toFixed(2)} m) verso ${direction}. Nodo: ${nx}/10, ${ny}/10.`
+  );
+  gridPlanState.pendingAddTilesAnchor = null;
 }
 
 function getGridProjectData() {
@@ -1055,20 +1085,47 @@ function loadGridProjectData(data) {
 
 function fitPlanGridIntoA4() {
   if (!els.planGrid || !els.planA4Sheet) return;
+  fitPlanSheetIntoStage();
   const sheetRect = els.planA4Sheet.getBoundingClientRect();
-  const availableW = Math.max(120, sheetRect.width - 32);
-  const availableH = Math.max(120, sheetRect.height - 32);
+  const availableW = Math.max(40, sheetRect.width - 36);
+  const availableH = Math.max(40, sheetRect.height - 36);
   const gap = 0;
-  const cellSize = Math.floor(
-    Math.max(
-      10,
-      Math.min(
-        (availableW - gap * Math.max(0, gridPlanState.cols - 1)) / Math.max(1, gridPlanState.cols),
-        (availableH - gap * Math.max(0, gridPlanState.rows - 1)) / Math.max(1, gridPlanState.rows)
-      )
-    )
+  const ratioX = Math.max(0.05, Number(gridPlanState.tileSizeX) || 1);
+  const ratioY = Math.max(0.05, Number(gridPlanState.tileSizeY) || 1);
+  const rawScale = Math.min(
+    (availableW - gap * Math.max(0, gridPlanState.cols - 1)) / Math.max(1, gridPlanState.cols * ratioX),
+    (availableH - gap * Math.max(0, gridPlanState.rows - 1)) / Math.max(1, gridPlanState.rows * ratioY)
   );
-  els.planGrid.style.setProperty("--plan-cell-size", `${cellSize}px`);
+  const scale = Math.max(1, rawScale);
+  const cellW = Math.max(1, Math.floor(scale * ratioX));
+  const cellH = Math.max(1, Math.floor(scale * ratioY));
+  els.planGrid.style.setProperty("--plan-cell-width", `${cellW}px`);
+  els.planGrid.style.setProperty("--plan-cell-height", `${cellH}px`);
+}
+
+function fitPlanSheetIntoStage() {
+  if (!els.planA4Stage || !els.planA4Sheet) return;
+  const stageRect = els.planA4Stage.getBoundingClientRect();
+  const availableW = Math.max(200, stageRect.width - 24);
+  const availableH = Math.max(260, stageRect.height - 24);
+  const a4Ratio = gridPlanState.a4Orientation === "landscape" ? 297 / 210 : 210 / 297;
+  let sheetW = availableW;
+  let sheetH = sheetW / a4Ratio;
+  if (sheetH > availableH) {
+    sheetH = availableH;
+    sheetW = sheetH * a4Ratio;
+  }
+  els.planA4Sheet.style.width = `${Math.floor(sheetW)}px`;
+  els.planA4Sheet.style.height = `${Math.floor(sheetH)}px`;
+  els.planA4Sheet.style.transform = `scale(${gridPlanState.zoom})`;
+}
+
+function setPlanZoom(nextZoom) {
+  gridPlanState.zoom = Math.max(0.4, Math.min(2.5, Number(nextZoom) || 1));
+  if (els.planZoomResetBtn) {
+    els.planZoomResetBtn.textContent = `${Math.round(gridPlanState.zoom * 100)}%`;
+  }
+  fitPlanSheetIntoStage();
 }
 
 function applyRoomSizeFromInputs() {
@@ -1101,11 +1158,49 @@ function initGridPlanEditor() {
   if (!els.planGrid) return;
   if (els.planSetupGenerateBtn) {
     els.planSetupGenerateBtn.addEventListener("click", () => {
+      const tx = Math.max(0.1, Math.min(10, Number(els.tileSizeXInput?.value || 0.6)));
+      const ty = Math.max(0.1, Math.min(10, Number(els.tileSizeYInput?.value || 0.6)));
+      gridPlanState.tileSize = tx;
+      gridPlanState.tileSizeX = tx;
+      gridPlanState.tileSizeY = ty;
+      setPlanSetupStep("tiles-count");
+      setPlanEditorStatus(`Dimensioni mattonella salvate (${tx.toFixed(2)}m x ${ty.toFixed(2)}m). Ora inserisci quante mattonelle per lato.`);
+    });
+  }
+
+  if (els.planSetupDrawGridLandscapeBtn) {
+    els.planSetupDrawGridLandscapeBtn.addEventListener("click", () => {
+      gridPlanState.a4Orientation = "landscape";
+      setPlanZoom(1);
+      applyRoomSizeFromInputs();
       setPlanEditorScreen("editor");
-      requestAnimationFrame(() => {
-        applyRoomSizeFromInputs();
-        setPlanEditorStatus("Griglia generata sul foglio A4.");
-      });
+      setPlanEditorStatus("Griglia A4 orizzontale generata.");
+    });
+  }
+
+  if (els.planSetupDrawGridPortraitBtn) {
+    els.planSetupDrawGridPortraitBtn.addEventListener("click", () => {
+      gridPlanState.a4Orientation = "portrait";
+      setPlanZoom(1);
+      applyRoomSizeFromInputs();
+      setPlanEditorScreen("editor");
+      setPlanEditorStatus("Griglia A4 verticale generata.");
+    });
+  }
+
+  if (els.planZoomInBtn) {
+    els.planZoomInBtn.addEventListener("click", () => {
+      setPlanZoom(gridPlanState.zoom + 0.1);
+    });
+  }
+  if (els.planZoomOutBtn) {
+    els.planZoomOutBtn.addEventListener("click", () => {
+      setPlanZoom(gridPlanState.zoom - 0.1);
+    });
+  }
+  if (els.planZoomResetBtn) {
+    els.planZoomResetBtn.addEventListener("click", () => {
+      setPlanZoom(1);
     });
   }
 
@@ -1115,6 +1210,12 @@ function initGridPlanEditor() {
     const x = Number(target.dataset.x);
     const y = Number(target.dataset.y);
     gridPlanState.activeCell = { x, y };
+    if (gridPlanState.firstSelectedNode) {
+      openNodePicker("segment", e.clientX, e.clientY);
+      setPlanEditorStatus("Seleziona il Punto B sulla griglia 10x10.");
+      e.preventDefault();
+      return;
+    }
     openPlanCellMenu(x, y, e.clientX, e.clientY);
     e.preventDefault();
   });
@@ -1125,6 +1226,7 @@ function initGridPlanEditor() {
       if (!action || !gridPlanState.activeCell) return;
       if (action === "select-nodes") {
         openNodePicker("segment", e.clientX || 180, e.clientY || 180);
+        setPlanEditorStatus("Seleziona il Punto A sulla griglia 10x10.");
         return;
       }
       if (action === "add-tiles") {
@@ -1147,32 +1249,48 @@ function initGridPlanEditor() {
     });
   }
 
+  if (els.planAddTilesCancelBtn) {
+    els.planAddTilesCancelBtn.addEventListener("click", () => {
+      gridPlanState.pendingAddTilesAnchor = null;
+      hidePlanMenus();
+    });
+  }
+  if (els.planAddTilesApplyBtn) {
+    els.planAddTilesApplyBtn.addEventListener("click", () => {
+      applyAddTilesFromDialog();
+    });
+  }
+
   document.addEventListener("click", (e) => {
     const t = e.target;
     if (els.planCellMenu && els.planCellMenu.contains(t)) return;
     if (els.planNodePicker && els.planNodePicker.contains(t)) return;
+    if (els.planAddTilesDialog && els.planAddTilesDialog.contains(t)) return;
     if (t && t.closest && t.closest(".plan-cell")) return;
     hidePlanMenus();
   });
 
-  if (els.tileSizeInput) {
-    els.tileSizeInput.addEventListener("input", () => {
-      const value = els.tileSizeInput.value;
-      if (els.tileSizeXInput) els.tileSizeXInput.value = value;
-      if (els.tileSizeYInput) els.tileSizeYInput.value = value;
-    });
-  }
-
   applyRoomSizeFromInputs();
+  setPlanZoom(1);
   setPlanEditorScreen("setup");
+  setPlanSetupStep("tile-size");
   updatePlanToolButtonsUi();
+
+  window.addEventListener("resize", () => {
+    if (els.planEditorModal && !els.planEditorModal.hidden && els.planEditorBody && !els.planEditorBody.hidden) {
+      fitPlanSheetIntoStage();
+      fitPlanGridIntoA4();
+      renderPlanGrid();
+    }
+  });
 }
 
 function openPlanEditorModal() {
   if (els.planEditorModal) els.planEditorModal.hidden = false;
   document.body.style.overflow = "hidden";
   setPlanEditorScreen("setup");
-  setPlanEditorStatus("Inserisci le misure e genera la griglia.");
+  setPlanSetupStep("tile-size");
+  setPlanEditorStatus("Inserisci solo le dimensioni orizzontale e verticale.");
   requestAnimationFrame(() => {
     fitPlanGridIntoA4();
   });

@@ -1049,11 +1049,19 @@ select:focus {
   font-weight: 600;
 }
 
+.plan-editor__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .plan-grid-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #111;
+  position: relative;
+  border: 0.2px dashed rgba(160, 160, 160, 0.35);
   border-radius: 0;
   background: #fff;
   overflow: visible;
@@ -1070,10 +1078,10 @@ select:focus {
 }
 
 .plan-cell {
-  width: var(--plan-cell-size, 26px);
-  height: var(--plan-cell-size, 26px);
+  width: var(--plan-cell-width, 26px);
+  height: var(--plan-cell-height, 26px);
   background: #fff;
-  border: 1px solid #111;
+  border: 0.2px dashed rgba(165, 165, 165, 0.28);
   box-sizing: border-box;
   padding: 0;
   margin: 0;
@@ -1138,12 +1146,13 @@ select:focus {
   align-items: center;
   justify-content: center;
   padding: 0.8rem;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .plan-a4-sheet {
   position: relative;
-  width: min(100%, 1000px);
+  width: 420px;
+  height: 594px;
   aspect-ratio: 210 / 297;
   background: #fff;
   border: 1px solid #d8ccbc;
@@ -1153,19 +1162,21 @@ select:focus {
   justify-content: center;
   overflow: hidden;
   padding: 1.1rem;
+  transform-origin: center center;
 }
 
 .plan-overlay {
   position: absolute;
-  inset: 1.1rem;
-  width: calc(100% - 2.2rem);
-  height: calc(100% - 2.2rem);
-  pointer-events: auto;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .plan-segment {
-  stroke: #4b4136;
-  stroke-width: 2.2;
+  stroke: #000;
+  stroke-width: 0.7;
+  stroke-dasharray: none;
   vector-effect: non-scaling-stroke;
   pointer-events: stroke;
 }
@@ -1186,7 +1197,8 @@ select:focus {
 
 .plan-cell-menu,
 .plan-node-picker,
-.plan-direction-menu {
+.plan-direction-menu,
+.plan-add-tiles-dialog {
   position: fixed;
   z-index: 320;
   background: #fffdfa;
@@ -1197,7 +1209,8 @@ select:focus {
 
 .plan-cell-menu[hidden],
 .plan-node-picker[hidden],
-.plan-direction-menu[hidden] {
+.plan-direction-menu[hidden],
+.plan-add-tiles-dialog[hidden] {
   display: none !important;
 }
 
@@ -1247,13 +1260,15 @@ select:focus {
 
 .plan-node-picker__grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-columns: repeat(11, var(--plan-node-cell-w, 18px));
+  grid-template-rows: repeat(11, var(--plan-node-cell-h, 18px));
   gap: 4px;
+  justify-content: center;
 }
 
 .plan-node-picker__node {
-  width: 100%;
-  aspect-ratio: 1;
+  width: var(--plan-node-cell-w, 18px);
+  height: var(--plan-node-cell-h, 18px);
   border: 1px solid #d8ccbc;
   background: #fff;
   border-radius: 4px;
@@ -1263,6 +1278,16 @@ select:focus {
 
 .plan-node-picker__node:hover {
   background: #f5ecdd;
+}
+
+.plan-add-tiles-dialog {
+  width: min(440px, calc(100vw - 1rem));
+  padding: 0.65rem;
+}
+
+.plan-add-tiles-dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
 }
 
 .plan-direction-menu {

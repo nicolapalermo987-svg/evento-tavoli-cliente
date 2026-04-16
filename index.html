@@ -304,36 +304,48 @@
       </div>
       <div class="plan-editor" id="planEditor">
         <div class="plan-setup-panel" id="planSetupPanel">
-          <h3 class="plan-setup-panel__title">Crea piantina</h3>
-          <p class="plan-setup-panel__text">Inserisci pochi dati e genera subito la griglia tecnica sul foglio A4.</p>
-          <div class="plan-setup-form">
-            <label class="plan-input-mini">
-              Dimensione mattonella
-              <input type="number" id="tileSizeInput" min="0.1" max="10" step="0.05" value="0.6" />
-            </label>
-            <label class="plan-input-mini">
-              Dim. orizzontale
-              <input type="number" id="tileSizeXInput" min="0.1" max="10" step="0.05" value="0.6" />
-            </label>
-            <label class="plan-input-mini">
-              Dim. verticale
-              <input type="number" id="tileSizeYInput" min="0.1" max="10" step="0.05" value="0.6" />
-            </label>
-            <label class="plan-input-mini">
-              Numero mat. orizz
-              <input type="number" id="roomTilesXInput" min="1" max="120" step="1" value="7" />
-            </label>
-            <label class="plan-input-mini">
-              Numero mattonelle vert
-              <input type="number" id="roomTilesYInput" min="1" max="120" step="1" value="8" />
-            </label>
+          <div id="planSetupStepTileSize">
+            <h3 class="plan-setup-panel__title">Crea piantina</h3>
+            <p class="plan-setup-panel__text">Inserisci le dimensioni della mattonella in metri.</p>
+            <div class="plan-setup-form">
+              <label class="plan-input-mini">
+                Dim. orizzontale (m)
+                <input type="number" id="tileSizeXInput" min="0.1" max="10" step="0.05" value="0.6" />
+              </label>
+              <label class="plan-input-mini">
+                Dim. verticale (m)
+                <input type="number" id="tileSizeYInput" min="0.1" max="10" step="0.05" value="0.6" />
+              </label>
+            </div>
+            <div class="plan-setup-panel__actions">
+              <button type="button" class="btn btn-primary" id="planSetupGenerateBtn">Continua</button>
+            </div>
           </div>
-          <div class="plan-setup-panel__actions">
-            <button type="button" class="btn btn-primary" id="planSetupGenerateBtn">Disegna griglia su foglio A4</button>
+
+          <div id="planSetupStepTilesCount" hidden>
+            <h3 class="plan-setup-panel__title">Numero mattonelle</h3>
+            <p class="plan-setup-panel__text">Quante mattonelle sul lato orizzontale e quante sul lato verticale?</p>
+            <div class="plan-setup-form">
+              <label class="plan-input-mini">
+                Mattonelle lato orizzontale
+                <input type="number" id="roomTilesXInput" min="1" max="120" step="1" value="7" />
+              </label>
+              <label class="plan-input-mini">
+                Mattonelle lato verticale
+                <input type="number" id="roomTilesYInput" min="1" max="120" step="1" value="8" />
+              </label>
+            </div>
+            <div class="plan-setup-panel__actions">
+              <button type="button" class="btn btn-primary" id="planSetupDrawGridLandscapeBtn">Disegna griglia su foglio A4 orizzontale</button>
+              <button type="button" class="btn btn-primary" id="planSetupDrawGridPortraitBtn">Disegna griglia su foglio A4 verticale</button>
+            </div>
           </div>
         </div>
         <div class="plan-editor__body" id="planEditorBody" hidden>
           <div class="plan-editor__toolbar">
+            <button type="button" class="btn btn-secondary btn-sm" id="planZoomOutBtn" aria-label="Riduci zoom">-</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="planZoomResetBtn">100%</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="planZoomInBtn" aria-label="Aumenta zoom">+</button>
             <span class="plan-editor__status" id="planEditorStatus">Doppio click su una mattonella per aprire il menu.</span>
           </div>
           <div class="plan-editor__summary" id="planGridSummary">Griglia: --</div>
@@ -341,8 +353,8 @@
             <div class="plan-a4-sheet" id="planA4Sheet">
               <div class="plan-grid-wrap" id="planGridWrap">
                 <div class="plan-grid" id="planGrid"></div>
+                <svg class="plan-overlay" id="planOverlay" viewBox="0 0 1000 1414" preserveAspectRatio="none"></svg>
               </div>
-              <svg class="plan-overlay" id="planOverlay" viewBox="0 0 1000 1414" preserveAspectRatio="xMidYMid meet"></svg>
             </div>
           </div>
         </div>
@@ -359,6 +371,44 @@
       <button type="button" class="plan-node-picker__close" id="planNodePickerCloseBtn" aria-label="Chiudi">×</button>
     </div>
     <div class="plan-node-picker__grid" id="planNodePickerGrid"></div>
+  </div>
+  <div class="plan-add-tiles-dialog" id="planAddTilesDialog" hidden>
+    <h3 class="plan-add-tiles-dialog__title">Aggiungi gruppo mattonelle</h3>
+    <div class="plan-setup-form">
+      <label class="plan-input-mini">
+        Dim. mattonella X (m)
+        <input type="number" id="planAddTileSizeXInput" min="0.1" max="10" step="0.05" value="0.6" />
+      </label>
+      <label class="plan-input-mini">
+        Dim. mattonella Y (m)
+        <input type="number" id="planAddTileSizeYInput" min="0.1" max="10" step="0.05" value="0.6" />
+      </label>
+      <label class="plan-input-mini">
+        Mattonelle orizzontali
+        <input type="number" id="planAddTilesWidthInput" min="1" max="120" step="1" value="3" />
+      </label>
+      <label class="plan-input-mini">
+        Mattonelle verticali
+        <input type="number" id="planAddTilesHeightInput" min="1" max="120" step="1" value="5" />
+      </label>
+      <label class="plan-input-mini">
+        Direzione
+        <select id="planAddTilesDirectionSelect">
+          <option value="alto">Alto</option>
+          <option value="basso">Basso</option>
+          <option value="sinistra">Sinistra</option>
+          <option value="destra" selected>Destra</option>
+          <option value="alto/sinistra">Alto/Sinistra</option>
+          <option value="alto/destra">Alto/Destra</option>
+          <option value="basso/sinistra">Basso/Sinistra</option>
+          <option value="basso/destra">Basso/Destra</option>
+        </select>
+      </label>
+    </div>
+    <div class="plan-setup-panel__actions">
+      <button type="button" class="btn btn-secondary btn-sm" id="planAddTilesCancelBtn">Annulla</button>
+      <button type="button" class="btn btn-primary btn-sm" id="planAddTilesApplyBtn">Applica</button>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
