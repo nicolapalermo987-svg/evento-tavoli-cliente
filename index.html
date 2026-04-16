@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Organizzazione tavoli — evento cerimoniale</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20260414a" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -24,9 +24,35 @@
 
     <div class="area-nav" role="region" aria-label="Navigazione aree principali">
       <div class="area-nav__row">
-        <button type="button" class="btn btn-secondary view-switch__btn is-active" id="showTablesAreaBtn" aria-pressed="true">Tavoli</button>
-        <button type="button" class="btn btn-secondary view-switch__btn" id="showMapAreaBtn" aria-pressed="false">Piantina</button>
-        <button type="button" class="btn btn-secondary view-switch__btn" id="showAcceptanceAreaBtn" aria-pressed="false">Accettazione</button>
+        <div class="area-nav__switch">
+          <button type="button" class="btn btn-secondary view-switch__btn is-active" id="showTablesAreaBtn" aria-pressed="true">Tavoli</button>
+          <button type="button" class="btn btn-secondary view-switch__btn" id="showMapAreaBtn" aria-pressed="false">Piantina</button>
+          <button type="button" class="btn btn-secondary view-switch__btn" id="showAcceptanceAreaBtn" aria-pressed="false">Accettazione</button>
+        </div>
+        <div class="dropdown" id="exportDropdown">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            id="exportMenuBtn"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="exportMenu"
+          >
+            Esportazioni ▾
+          </button>
+        </div>
+        <div class="dropdown" id="importDropdown">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            id="importMenuBtn"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="importMenu"
+          >
+            Importazioni ▾
+          </button>
+        </div>
       </div>
     </div>
 
@@ -46,51 +72,32 @@
             <span class="btn-icon__dots" aria-hidden="true">⋮</span>
             <span class="visually-hidden">Menu azioni tavoli</span>
           </button>
-          <div class="dropdown__panel" id="tableActionsMenu" role="menu" hidden>
-            <button type="button" class="dropdown__item" id="sortTablesBtn" role="menuitem">Riordina tavoli 1→N</button>
-            <button type="button" class="dropdown__item" id="renumberTablesBtn" role="menuitem">Rinumerazione intelligente</button>
-          </div>
         </div>
-        <div class="dropdown" id="exportDropdown">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            id="exportMenuBtn"
-            aria-expanded="false"
-            aria-haspopup="true"
-            aria-controls="exportMenu"
-          >
-            Esportazioni ▾
-          </button>
-          <div class="dropdown__panel dropdown__panel--wide" id="exportMenu" role="menu" hidden>
-            <button type="button" class="dropdown__item" id="exportPlanPdfBtn" role="menuitem">Esporta piantina PDF</button>
-            <button type="button" class="dropdown__item" id="exportGuestsBtn" role="menuitem">Esporta partecipanti A-Z PDF</button>
-            <button type="button" class="dropdown__item" id="exportKitchenBtn" role="menuitem">Esporta riepilogo cucina PDF</button>
-            <button type="button" class="dropdown__item" id="exportSegnatavoliBtn" role="menuitem">Segnatavoli A5 (anteprima e stile)</button>
-            <button type="button" class="dropdown__item" id="exportBtn" role="menuitem">Esporta JSON</button>
-          </div>
-        </div>
-        <div class="dropdown" id="importDropdown">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            id="importMenuBtn"
-            aria-expanded="false"
-            aria-haspopup="true"
-            aria-controls="importMenu"
-          >
-            Importazioni ▾
-          </button>
-          <div class="dropdown__panel" id="importMenu" role="menu" hidden>
-            <button type="button" class="dropdown__item" id="importJsonBtn" role="menuitem">Importa JSON progetto</button>
-          </div>
-        </div>
-        <input type="file" id="importInput" accept="application/json,.json" hidden />
         <span class="table-count" id="tableCountLabel">0 tavoli</span>
         <span class="current-table-badge" id="currentTableBadge" aria-live="polite">Tavolo —</span>
       </div>
     </div>
+    <input type="file" id="importInput" accept="application/json,.json" hidden />
     <div class="dropdown-backdrop" id="dropdownBackdrop" hidden aria-hidden="true"></div>
+    <div class="dropdown-panels-root" aria-hidden="true">
+      <div class="dropdown__panel dropdown__panel--wide" id="exportMenu" role="menu" hidden>
+        <button type="button" class="dropdown__close" data-close-dropdown="true" aria-label="Chiudi menu">×</button>
+        <button type="button" class="dropdown__item" id="exportPlanPdfBtn" role="menuitem">Esporta piantina PDF</button>
+        <button type="button" class="dropdown__item" id="exportGuestsBtn" role="menuitem">Esporta partecipanti A-Z PDF</button>
+        <button type="button" class="dropdown__item" id="exportKitchenBtn" role="menuitem">Esporta riepilogo cucina PDF</button>
+        <button type="button" class="dropdown__item" id="exportSegnatavoliBtn" role="menuitem">Segnatavoli A5 (anteprima e stile)</button>
+        <button type="button" class="dropdown__item" id="exportBtn" role="menuitem">Esporta JSON</button>
+      </div>
+      <div class="dropdown__panel" id="importMenu" role="menu" hidden>
+        <button type="button" class="dropdown__close" data-close-dropdown="true" aria-label="Chiudi menu">×</button>
+        <button type="button" class="dropdown__item" id="importJsonBtn" role="menuitem">Importa JSON progetto</button>
+      </div>
+      <div class="dropdown__panel" id="tableActionsMenu" role="menu" hidden>
+        <button type="button" class="dropdown__close" data-close-dropdown="true" aria-label="Chiudi menu">×</button>
+        <button type="button" class="dropdown__item" id="sortTablesBtn" role="menuitem">Riordina tavoli 1→N</button>
+        <button type="button" class="dropdown__item" id="renumberTablesBtn" role="menuitem">Rinumerazione intelligente</button>
+      </div>
+    </div>
 
     <main class="main-grid">
       <section class="panel panel--data" id="tablesAreaPanel" aria-labelledby="data-heading">
@@ -109,6 +116,7 @@
             Carica piantina
             <input type="file" id="floorPlanInput" accept="image/*" hidden />
           </label>
+          <button type="button" class="btn btn-secondary" id="createFloorPlanBtn">Crea piantina</button>
           <button type="button" class="btn btn-ghost" id="clearPlanBtn" title="Rimuovi solo l’immagine">Rimuovi immagine</button>
         </div>
 
@@ -287,8 +295,74 @@
     </div>
   </div>
 
+  <div class="plan-editor-modal" id="planEditorModal" hidden aria-hidden="true">
+    <div class="plan-editor-modal__backdrop" id="planEditorBackdrop"></div>
+    <div class="plan-editor-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="planEditorTitle">
+      <div class="plan-editor-modal__header">
+        <h2 id="planEditorTitle" class="plan-editor-modal__title">Crea piantina</h2>
+        <button type="button" class="btn btn-ghost btn-sm plan-editor-modal__close" id="planEditorCloseBtn" aria-label="Chiudi">×</button>
+      </div>
+      <div class="plan-editor" id="planEditor">
+        <div class="plan-setup-panel" id="planSetupPanel">
+          <h3 class="plan-setup-panel__title">Crea piantina</h3>
+          <p class="plan-setup-panel__text">Inserisci pochi dati e genera subito la griglia tecnica sul foglio A4.</p>
+          <div class="plan-setup-form">
+            <label class="plan-input-mini">
+              Dimensione mattonella
+              <input type="number" id="tileSizeInput" min="0.1" max="10" step="0.05" value="0.6" />
+            </label>
+            <label class="plan-input-mini">
+              Dim. orizzontale
+              <input type="number" id="tileSizeXInput" min="0.1" max="10" step="0.05" value="0.6" />
+            </label>
+            <label class="plan-input-mini">
+              Dim. verticale
+              <input type="number" id="tileSizeYInput" min="0.1" max="10" step="0.05" value="0.6" />
+            </label>
+            <label class="plan-input-mini">
+              Numero mat. orizz
+              <input type="number" id="roomTilesXInput" min="1" max="120" step="1" value="7" />
+            </label>
+            <label class="plan-input-mini">
+              Numero mattonelle vert
+              <input type="number" id="roomTilesYInput" min="1" max="120" step="1" value="8" />
+            </label>
+          </div>
+          <div class="plan-setup-panel__actions">
+            <button type="button" class="btn btn-primary" id="planSetupGenerateBtn">Disegna griglia su foglio A4</button>
+          </div>
+        </div>
+        <div class="plan-editor__body" id="planEditorBody" hidden>
+          <div class="plan-editor__toolbar">
+            <span class="plan-editor__status" id="planEditorStatus">Doppio click su una mattonella per aprire il menu.</span>
+          </div>
+          <div class="plan-editor__summary" id="planGridSummary">Griglia: --</div>
+          <div class="plan-a4-stage" id="planA4Stage">
+            <div class="plan-a4-sheet" id="planA4Sheet">
+              <div class="plan-grid-wrap" id="planGridWrap">
+                <div class="plan-grid" id="planGrid"></div>
+              </div>
+              <svg class="plan-overlay" id="planOverlay" viewBox="0 0 1000 1414" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="plan-cell-menu" id="planCellMenu" hidden>
+    <button type="button" class="plan-cell-menu__item" data-plan-action="add-tiles">Aggiungi gruppo mattonelle</button>
+    <button type="button" class="plan-cell-menu__item" data-plan-action="select-nodes">Disegna segmento</button>
+  </div>
+  <div class="plan-node-picker" id="planNodePicker" hidden>
+    <div class="plan-node-picker__header">
+      <span id="planNodePickerTitle">Seleziona nodo</span>
+      <button type="button" class="plan-node-picker__close" id="planNodePickerCloseBtn" aria-label="Chiudi">×</button>
+    </div>
+    <div class="plan-node-picker__grid" id="planNodePickerGrid"></div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260414a"></script>
 </body>
 </html>

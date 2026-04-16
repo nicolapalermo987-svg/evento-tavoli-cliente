@@ -19,6 +19,31 @@ const acceptanceUiState = {
   selectedTableId: "",
 };
 
+const gridPlanState = {
+  cols: 7,
+  rows: 8,
+  roomWidth: 7,
+  roomHeight: 8,
+  roomOriginX: 0,
+  roomOriginY: 0,
+  tileSize: 0.6,
+  tileSizeX: 0.6,
+  tileSizeY: 0.6,
+  cells: new Map(),
+  segments: [],
+  pendingNodeAction: "",
+  firstSelectedNode: null,
+  activeCell: null,
+};
+
+const sketchPlanState = {
+  fabricCanvas: null,
+  selectedZone: null,
+  baseSnapshot: [],
+  globalScale: 1,
+  nextZoneId: 1,
+};
+
 const els = {
   eventName: document.getElementById("eventName"),
   stickyToolbar: document.getElementById("stickyToolbar"),
@@ -51,12 +76,36 @@ const els = {
   dropdownBackdrop: document.getElementById("dropdownBackdrop"),
   importJsonBtn: document.getElementById("importJsonBtn"),
   floorPlanInput: document.getElementById("floorPlanInput"),
+  createFloorPlanBtn: document.getElementById("createFloorPlanBtn"),
   clearPlanBtn: document.getElementById("clearPlanBtn"),
   floorWrap: document.getElementById("floorWrap"),
   floorHint: document.getElementById("floorHint"),
   floorStage: document.getElementById("floorStage"),
   floorImg: document.getElementById("floorImg"),
   floorMarkers: document.getElementById("floorMarkers"),
+  tileSizeInput: document.getElementById("tileSizeInput"),
+  tileSizeXInput: document.getElementById("tileSizeXInput"),
+  tileSizeYInput: document.getElementById("tileSizeYInput"),
+  roomTilesXInput: document.getElementById("roomTilesXInput"),
+  roomTilesYInput: document.getElementById("roomTilesYInput"),
+  planGridSummary: document.getElementById("planGridSummary"),
+  planGrid: document.getElementById("planGrid"),
+  planOverlay: document.getElementById("planOverlay"),
+  planCellMenu: document.getElementById("planCellMenu"),
+  planNodePicker: document.getElementById("planNodePicker"),
+  planNodePickerTitle: document.getElementById("planNodePickerTitle"),
+  planNodePickerGrid: document.getElementById("planNodePickerGrid"),
+  planNodePickerCloseBtn: document.getElementById("planNodePickerCloseBtn"),
+  planEditorModal: document.getElementById("planEditorModal"),
+  planEditorBackdrop: document.getElementById("planEditorBackdrop"),
+  planEditorCloseBtn: document.getElementById("planEditorCloseBtn"),
+  planA4Stage: document.getElementById("planA4Stage"),
+  planA4Sheet: document.getElementById("planA4Sheet"),
+  planEditor: document.getElementById("planEditor"),
+  planSetupPanel: document.getElementById("planSetupPanel"),
+  planSetupGenerateBtn: document.getElementById("planSetupGenerateBtn"),
+  planEditorBody: document.getElementById("planEditorBody"),
+  planEditorStatus: document.getElementById("planEditorStatus"),
   exportPlanPdfBtn: document.getElementById("exportPlanPdfBtn"),
   exportGuestsBtn: document.getElementById("exportGuestsBtn"),
   exportKitchenBtn: document.getElementById("exportKitchenBtn"),
@@ -578,10 +627,6 @@ function closeAllDropdowns() {
   if (els.importMenuBtn) {
     els.importMenuBtn.setAttribute("aria-expanded", "false");
   }
-  if (els.dropdownBackdrop) {
-    els.dropdownBackdrop.hidden = true;
-  }
-  document.body.classList.remove("dropdown-menu-open");
 }
 
 function toggleDropdown(panel, button) {
@@ -590,10 +635,21 @@ function toggleDropdown(panel, button) {
   panel.hidden = !willOpen;
   button.setAttribute("aria-expanded", willOpen ? "true" : "false");
   if (willOpen) {
-    if (els.dropdownBackdrop) {
-      els.dropdownBackdrop.hidden = false;
-    }
-    document.body.classList.add("dropdown-menu-open");
+    panel.scrollTop = 0;
+  }
+}
+
+function ensureExportPlanPdfMenuItem() {
+  if (!els.exportMenu) return;
+  let btn = els.exportMenu.querySelector("#exportPlanPdfBtn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dropdown__item";
+    btn.id = "exportPlanPdfBtn";
+    btn.setAttribute("role", "menuitem");
+    btn.textContent = "Esporta piantina PDF";
+    els.exportMenu.prepend(btn);
   }
 }
 
@@ -628,6 +684,541 @@ function setMainAreaView(view) {
     els.showAcceptanceAreaBtn.classList.toggle("is-active", isActive);
     els.showAcceptanceAreaBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
   }
+}
+
+function planCellKey(x, y) {
+  return `${x},${y}`;
+}
+
+function roomBounds() {
+  return {
+    x0: gridPlanState.roomOriginX,
+    y0: gridPlanState.roomOriginY,
+    x1: gridPlanState.roomOriginX + gridPlanState.roomWidth - 1,
+    y1: gridPlanState.roomOriginY + gridPlanState.roomHeight - 1,
+  };
+}
+
+function isInsideRoom(x, y) {
+  return gridPlanState.cells.has(planCellKey(x, y));
+}
+
+function getPlanCellType(x, y) {
+  return gridPlanState.cells.get(planCellKey(x, y)) || null;
+}
+
+function createPlanTileData(tileSizeX = gridPlanState.tileSizeX, tileSizeY = gridPlanState.tileSizeY) {
+  return {
+    type: "room",
+    tileSizeX,
+    tileSizeY,
+  };
+}
+
+function rebuildPlanBounds() {
+  const coords = Array.from(gridPlanState.cells.keys()).map((key) => key.split(",").map(Number));
+  if (!coords.length) {
+    gridPlanState.cols = 0;
+    gridPlanState.rows = 0;
+    gridPlanState.roomWidth = 0;
+    gridPlanState.roomHeight = 0;
+    return;
+  }
+  const xs = coords.map(([x]) => x);
+  const ys = coords.map(([, y]) => y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  if (minX < 0 || minY < 0) {
+    const shiftX = minX < 0 ? -minX : 0;
+    const shiftY = minY < 0 ? -minY : 0;
+    const movedCells = new Map();
+    for (const [key, value] of gridPlanState.cells.entries()) {
+      const [x, y] = key.split(",").map(Number);
+      movedCells.set(planCellKey(x + shiftX, y + shiftY), value);
+    }
+    gridPlanState.cells = movedCells;
+    gridPlanState.segments = gridPlanState.segments.map((segment) => ({
+      ...segment,
+      a: { ...segment.a, x: segment.a.x + shiftX, y: segment.a.y + shiftY },
+      b: { ...segment.b, x: segment.b.x + shiftX, y: segment.b.y + shiftY },
+    }));
+    if (gridPlanState.firstSelectedNode) {
+      gridPlanState.firstSelectedNode = {
+        ...gridPlanState.firstSelectedNode,
+        x: gridPlanState.firstSelectedNode.x + shiftX,
+        y: gridPlanState.firstSelectedNode.y + shiftY,
+      };
+    }
+    if (gridPlanState.activeCell) {
+      gridPlanState.activeCell = {
+        x: gridPlanState.activeCell.x + shiftX,
+        y: gridPlanState.activeCell.y + shiftY,
+      };
+    }
+    return rebuildPlanBounds();
+  }
+
+  gridPlanState.roomOriginX = 0;
+  gridPlanState.roomOriginY = 0;
+  gridPlanState.cols = maxX + 1;
+  gridPlanState.rows = maxY + 1;
+  gridPlanState.roomWidth = gridPlanState.cols;
+  gridPlanState.roomHeight = gridPlanState.rows;
+}
+
+function computePlanSummary() {
+  let tiles = 0;
+  let totalArea = 0;
+  for (const tile of gridPlanState.cells.values()) {
+    tiles += 1;
+    totalArea += Number(tile.tileSizeX || gridPlanState.tileSizeX) * Number(tile.tileSizeY || gridPlanState.tileSizeY);
+  }
+  return { tiles, totalArea };
+}
+
+function updatePlanSummaryUi() {
+  if (!els.planGridSummary) return;
+  const s = computePlanSummary();
+  els.planGridSummary.textContent = `Griglia: ${gridPlanState.cols} x ${gridPlanState.rows} • Mattonelle: ${s.tiles} • Area totale: ${s.totalArea.toFixed(2)} m²`;
+}
+
+function updatePlanToolButtonsUi() {
+  return;
+}
+
+function setPlanEditorScreen(screen) {
+  if (els.planSetupPanel) els.planSetupPanel.hidden = screen === "editor";
+  if (els.planEditorBody) els.planEditorBody.hidden = screen !== "editor";
+  if (screen === "editor") {
+    requestAnimationFrame(() => {
+      fitPlanGridIntoA4();
+      renderPlanGrid();
+    });
+  }
+}
+
+function renderPlanGrid() {
+  if (!els.planGrid) return;
+  els.planGrid.innerHTML = "";
+  els.planGrid.style.gridTemplateColumns = `repeat(${Math.max(1, gridPlanState.cols)}, var(--plan-cell-size, 26px))`;
+  const frag = document.createDocumentFragment();
+  for (let y = 0; y < gridPlanState.rows; y += 1) {
+    for (let x = 0; x < gridPlanState.cols; x += 1) {
+      const cell = getPlanCellType(x, y);
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "plan-cell";
+      tile.dataset.x = String(x);
+      tile.dataset.y = String(y);
+      tile.title = `Mattonella ${x + 1}, ${y + 1}`;
+      if (!cell) {
+        tile.classList.add("plan-cell--outside");
+      }
+      if (gridPlanState.firstSelectedNode && gridPlanState.firstSelectedNode.x === x && gridPlanState.firstSelectedNode.y === y) {
+        tile.classList.add("plan-cell--node-source");
+      }
+      frag.appendChild(tile);
+    }
+  }
+  els.planGrid.appendChild(frag);
+  fitPlanGridIntoA4();
+  renderPlanOverlay();
+  updatePlanSummaryUi();
+}
+
+function renderPlanOverlay() {
+  if (!els.planOverlay) return;
+  const cellSize = Number.parseFloat(getComputedStyle(els.planGrid).getPropertyValue("--plan-cell-size")) || 26;
+  const gap = 0;
+  const width = gridPlanState.cols * cellSize + Math.max(0, gridPlanState.cols - 1) * gap;
+  const height = gridPlanState.rows * cellSize + Math.max(0, gridPlanState.rows - 1) * gap;
+  els.planOverlay.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  els.planOverlay.innerHTML = "";
+
+  gridPlanState.segments.forEach((seg) => {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(nodeToPixel(seg.a.x, seg.a.nx, cellSize, gap)));
+    line.setAttribute("y1", String(nodeToPixel(seg.a.y, seg.a.ny, cellSize, gap)));
+    line.setAttribute("x2", String(nodeToPixel(seg.b.x, seg.b.nx, cellSize, gap)));
+    line.setAttribute("y2", String(nodeToPixel(seg.b.y, seg.b.ny, cellSize, gap)));
+    line.setAttribute("class", "plan-segment");
+    line.dataset.segmentId = seg.id;
+    els.planOverlay.appendChild(line);
+  });
+
+  if (gridPlanState.firstSelectedNode) {
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    marker.setAttribute("cx", String(nodeToPixel(gridPlanState.firstSelectedNode.x, gridPlanState.firstSelectedNode.nx, cellSize, gap)));
+    marker.setAttribute("cy", String(nodeToPixel(gridPlanState.firstSelectedNode.y, gridPlanState.firstSelectedNode.ny, cellSize, gap)));
+    marker.setAttribute("r", "6");
+    marker.setAttribute("class", "plan-node-highlight");
+    els.planOverlay.appendChild(marker);
+  }
+}
+
+function nodeToPixel(cellIndex, nodeIndex, cellSize, gap) {
+  return cellIndex * (cellSize + gap) + (nodeIndex / 9) * cellSize;
+}
+
+function hidePlanMenus() {
+  if (els.planCellMenu) els.planCellMenu.hidden = true;
+  if (els.planNodePicker) els.planNodePicker.hidden = true;
+}
+
+function openPlanCellMenu(x, y, clientX, clientY) {
+  gridPlanState.activeCell = { x, y };
+  if (!els.planCellMenu) return;
+  hidePlanMenus();
+  els.planCellMenu.hidden = false;
+  els.planCellMenu.style.left = `${clientX}px`;
+  els.planCellMenu.style.top = `${clientY}px`;
+}
+
+function openNodePicker(action, clientX, clientY) {
+  if (!els.planNodePicker || !els.planNodePickerGrid || !gridPlanState.activeCell) return;
+  hidePlanMenus();
+  gridPlanState.pendingNodeAction = action;
+  els.planNodePickerTitle.textContent =
+    action === "add-tiles"
+      ? "Scegli il nodo di ancoraggio"
+      : action === "label"
+        ? "Scegli il nodo dove ancorare il testo"
+        : "Scegli un nodo 10x10";
+  els.planNodePickerGrid.innerHTML = "";
+  for (let ny = 0; ny < 10; ny += 1) {
+    for (let nx = 0; nx < 10; nx += 1) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "plan-node-picker__node";
+      btn.dataset.nx = String(nx);
+      btn.dataset.ny = String(ny);
+      els.planNodePickerGrid.appendChild(btn);
+    }
+  }
+  els.planNodePicker.hidden = false;
+  els.planNodePicker.style.left = `${Math.max(8, clientX - 140)}px`;
+  els.planNodePicker.style.top = `${Math.max(8, clientY - 40)}px`;
+}
+
+function commitNodeSelection(nx, ny) {
+  const cell = gridPlanState.activeCell;
+  if (!cell) return;
+  const tile = getPlanCellType(cell.x, cell.y);
+  if (!tile) {
+    hidePlanMenus();
+    setPlanEditorStatus("Seleziona una mattonella attiva.");
+    return;
+  }
+  if (gridPlanState.pendingNodeAction === "add-tiles") {
+    addTilesFromNodeSelection(cell, nx, ny);
+    return;
+  }
+  const node = { x: cell.x, y: cell.y, nx, ny };
+  if (!gridPlanState.firstSelectedNode) {
+    gridPlanState.firstSelectedNode = node;
+    hidePlanMenus();
+    renderPlanOverlay();
+    setPlanEditorStatus("Primo nodo selezionato. Scegli ora il secondo nodo.");
+  } else {
+    if (
+      gridPlanState.firstSelectedNode.x === node.x &&
+      gridPlanState.firstSelectedNode.y === node.y &&
+      gridPlanState.firstSelectedNode.nx === node.nx &&
+      gridPlanState.firstSelectedNode.ny === node.ny
+    ) {
+      gridPlanState.firstSelectedNode = null;
+      hidePlanMenus();
+      renderPlanOverlay();
+      setPlanEditorStatus("Secondo nodo identico al primo: nessun segmento disegnato.");
+      return;
+    }
+    gridPlanState.segments.push({
+      id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      a: gridPlanState.firstSelectedNode,
+      b: node,
+    });
+    gridPlanState.firstSelectedNode = null;
+    hidePlanMenus();
+    renderPlanOverlay();
+    setPlanEditorStatus("Segmento creato.");
+  }
+}
+
+function addTilesFromNodeSelection(cell, nx, ny) {
+  const tileSizeValue = window.prompt("Dimensione nuova mattonella (numero):", String(gridPlanState.tileSize));
+  if (tileSizeValue == null) {
+    hidePlanMenus();
+    return;
+  }
+  const tileSize = Math.max(0.1, Number(tileSizeValue));
+  if (!Number.isFinite(tileSize)) {
+    setPlanEditorStatus("Dimensione mattonella non valida.", true);
+    hidePlanMenus();
+    return;
+  }
+
+  const sizeValue = window.prompt("Dimensioni della tabella da aggiungere (esempio 3x5):", "3x5");
+  if (sizeValue == null) {
+    hidePlanMenus();
+    return;
+  }
+  const match = String(sizeValue).trim().match(/^(\d+)\s*x\s*(\d+)$/i);
+  if (!match) {
+    setPlanEditorStatus("Formato dimensioni non valido. Usa ad esempio 3x5.", true);
+    hidePlanMenus();
+    return;
+  }
+  const width = Math.max(1, Number(match[1]));
+  const height = Math.max(1, Number(match[2]));
+
+  const dirLabel = window.prompt(
+    "Direzione: sinistra/alto, sinistra/basso, destra/alto, destra/basso, alto/destra, basso/sinistra, basso/destra",
+    "destra/basso"
+  );
+  if (dirLabel == null) {
+    hidePlanMenus();
+    return;
+  }
+
+  const direction = String(dirLabel).trim().toLowerCase();
+  const directions = {
+    "sinistra/alto": { sx: -1, sy: -1 },
+    "sinistra/basso": { sx: -1, sy: 0 },
+    "destra/alto": { sx: 0, sy: -1 },
+    "destra/basso": { sx: 0, sy: 0 },
+    "alto/destra": { sx: 0, sy: -1 },
+    "basso/sinistra": { sx: -1, sy: 0 },
+    "basso/destra": { sx: 0, sy: 0 },
+  };
+  const anchor = directions[direction];
+  if (!anchor) {
+    setPlanEditorStatus("Direzione non valida.", true);
+    hidePlanMenus();
+    return;
+  }
+
+  const startX = cell.x + anchor.sx * (width - 1);
+  const startY = cell.y + anchor.sy * (height - 1);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const px = startX + x;
+      const py = startY + y;
+      gridPlanState.cells.set(planCellKey(px, py), createPlanTileData(tileSize, tileSize));
+    }
+  }
+  gridPlanState.tileSize = tileSize;
+  rebuildPlanBounds();
+  hidePlanMenus();
+  renderPlanGrid();
+  setPlanEditorStatus(`Aggiunte ${width}x${height} mattonelle verso ${direction}. Nodo scelto: ${nx + 1}/${ny + 1}.`);
+}
+
+function getGridProjectData() {
+  return {
+    tileSize: gridPlanState.tileSize,
+    tileSizeX: gridPlanState.tileSizeX,
+    tileSizeY: gridPlanState.tileSizeY,
+    cols: gridPlanState.cols,
+    rows: gridPlanState.rows,
+    roomWidth: gridPlanState.roomWidth,
+    roomHeight: gridPlanState.roomHeight,
+    roomOriginX: gridPlanState.roomOriginX,
+    roomOriginY: gridPlanState.roomOriginY,
+    cells: Array.from(gridPlanState.cells.entries()),
+    segments: gridPlanState.segments,
+  };
+}
+
+function loadGridProjectData(data) {
+  gridPlanState.tileSize = Number(data.tileSize || 0.6);
+  gridPlanState.tileSizeX = Number(data.tileSizeX || 0.6);
+  gridPlanState.tileSizeY = Number(data.tileSizeY || 0.6);
+  gridPlanState.cols = Number(data.cols || 7);
+  gridPlanState.rows = Number(data.rows || 8);
+  gridPlanState.roomWidth = Number(data.roomWidth || 7);
+  gridPlanState.roomHeight = Number(data.roomHeight || 8);
+  gridPlanState.roomOriginX = Number(data.roomOriginX || 0);
+  gridPlanState.roomOriginY = Number(data.roomOriginY || 0);
+  gridPlanState.cells = new Map(Array.isArray(data.cells) ? data.cells : []);
+  gridPlanState.segments = Array.isArray(data.segments) ? data.segments : [];
+  gridPlanState.firstSelectedNode = null;
+  if (els.tileSizeInput) els.tileSizeInput.value = String(gridPlanState.tileSize);
+  if (els.tileSizeXInput) els.tileSizeXInput.value = String(gridPlanState.tileSizeX);
+  if (els.tileSizeYInput) els.tileSizeYInput.value = String(gridPlanState.tileSizeY);
+  if (els.roomTilesXInput) els.roomTilesXInput.value = String(gridPlanState.roomWidth);
+  if (els.roomTilesYInput) els.roomTilesYInput.value = String(gridPlanState.roomHeight);
+  renderPlanGrid();
+}
+
+function fitPlanGridIntoA4() {
+  if (!els.planGrid || !els.planA4Sheet) return;
+  const sheetRect = els.planA4Sheet.getBoundingClientRect();
+  const availableW = Math.max(120, sheetRect.width - 32);
+  const availableH = Math.max(120, sheetRect.height - 32);
+  const gap = 0;
+  const cellSize = Math.floor(
+    Math.max(
+      10,
+      Math.min(
+        (availableW - gap * Math.max(0, gridPlanState.cols - 1)) / Math.max(1, gridPlanState.cols),
+        (availableH - gap * Math.max(0, gridPlanState.rows - 1)) / Math.max(1, gridPlanState.rows)
+      )
+    )
+  );
+  els.planGrid.style.setProperty("--plan-cell-size", `${cellSize}px`);
+}
+
+function applyRoomSizeFromInputs() {
+  const rw = Math.max(1, Math.min(120, Number(els.roomTilesXInput?.value || 7)));
+  const rh = Math.max(1, Math.min(120, Number(els.roomTilesYInput?.value || 8)));
+  const base = Math.max(0.1, Math.min(10, Number(els.tileSizeInput?.value || 0.6)));
+  const tx = Math.max(0.1, Math.min(10, Number(els.tileSizeXInput?.value || base)));
+  const ty = Math.max(0.1, Math.min(10, Number(els.tileSizeYInput?.value || base)));
+  gridPlanState.tileSize = base;
+  gridPlanState.roomWidth = Math.round(rw);
+  gridPlanState.roomHeight = Math.round(rh);
+  gridPlanState.tileSizeX = tx;
+  gridPlanState.tileSizeY = ty;
+  gridPlanState.cols = gridPlanState.roomWidth;
+  gridPlanState.rows = gridPlanState.roomHeight;
+  gridPlanState.roomOriginX = 0;
+  gridPlanState.roomOriginY = 0;
+  gridPlanState.cells = new Map();
+  for (let y = 0; y < gridPlanState.rows; y += 1) {
+    for (let x = 0; x < gridPlanState.cols; x += 1) {
+      gridPlanState.cells.set(planCellKey(x, y), createPlanTileData(tx, ty));
+    }
+  }
+  gridPlanState.segments = [];
+  gridPlanState.firstSelectedNode = null;
+  renderPlanGrid();
+}
+
+function initGridPlanEditor() {
+  if (!els.planGrid) return;
+  if (els.planSetupGenerateBtn) {
+    els.planSetupGenerateBtn.addEventListener("click", () => {
+      setPlanEditorScreen("editor");
+      requestAnimationFrame(() => {
+        applyRoomSizeFromInputs();
+        setPlanEditorStatus("Griglia generata sul foglio A4.");
+      });
+    });
+  }
+
+  els.planGrid.addEventListener("dblclick", (e) => {
+    const target = e.target.closest(".plan-cell");
+    if (!target) return;
+    const x = Number(target.dataset.x);
+    const y = Number(target.dataset.y);
+    gridPlanState.activeCell = { x, y };
+    openPlanCellMenu(x, y, e.clientX, e.clientY);
+    e.preventDefault();
+  });
+
+  if (els.planCellMenu) {
+    els.planCellMenu.addEventListener("click", (e) => {
+      const action = e.target.closest("[data-plan-action]")?.dataset.planAction;
+      if (!action || !gridPlanState.activeCell) return;
+      if (action === "select-nodes") {
+        openNodePicker("segment", e.clientX || 180, e.clientY || 180);
+        return;
+      }
+      if (action === "add-tiles") {
+        openNodePicker("add-tiles", e.clientX || 180, e.clientY || 180);
+      }
+    });
+  }
+
+  if (els.planNodePickerGrid) {
+    els.planNodePickerGrid.addEventListener("click", (e) => {
+      const node = e.target.closest(".plan-node-picker__node");
+      if (!node) return;
+      commitNodeSelection(Number(node.dataset.nx), Number(node.dataset.ny));
+    });
+  }
+
+  if (els.planNodePickerCloseBtn) {
+    els.planNodePickerCloseBtn.addEventListener("click", () => {
+      hidePlanMenus();
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (els.planCellMenu && els.planCellMenu.contains(t)) return;
+    if (els.planNodePicker && els.planNodePicker.contains(t)) return;
+    if (t && t.closest && t.closest(".plan-cell")) return;
+    hidePlanMenus();
+  });
+
+  if (els.tileSizeInput) {
+    els.tileSizeInput.addEventListener("input", () => {
+      const value = els.tileSizeInput.value;
+      if (els.tileSizeXInput) els.tileSizeXInput.value = value;
+      if (els.tileSizeYInput) els.tileSizeYInput.value = value;
+    });
+  }
+
+  applyRoomSizeFromInputs();
+  setPlanEditorScreen("setup");
+  updatePlanToolButtonsUi();
+}
+
+function openPlanEditorModal() {
+  if (els.planEditorModal) els.planEditorModal.hidden = false;
+  document.body.style.overflow = "hidden";
+  setPlanEditorScreen("setup");
+  setPlanEditorStatus("Inserisci le misure e genera la griglia.");
+  requestAnimationFrame(() => {
+    fitPlanGridIntoA4();
+  });
+}
+
+function closePlanEditorModal() {
+  if (els.planEditorModal) els.planEditorModal.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function getCurrentMainAreaView() {
+  if (els.mapAreaPanel && !els.mapAreaPanel.hidden) return "map";
+  if (els.acceptanceAreaPanel && !els.acceptanceAreaPanel.hidden) return "acceptance";
+  return "tables";
+}
+
+function waitForNextFrame() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+function waitForFloorImageReady(timeoutMs = 1200) {
+  return new Promise((resolve) => {
+    const img = els.floorImg;
+    if (!img || img.hidden || !img.getAttribute("src")) {
+      resolve();
+      return;
+    }
+    if (img.complete) {
+      resolve();
+      return;
+    }
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      img.removeEventListener("load", finish);
+      img.removeEventListener("error", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    img.addEventListener("load", finish, { once: true });
+    img.addEventListener("error", finish, { once: true });
+  });
 }
 
 /** Testo sotto il marcatore sulla piantina: solo allergie/note tavolo, senza ripetere 5A+2B */
@@ -1201,6 +1792,251 @@ function readFileAsDataUrl(file) {
     r.onerror = () => reject(r.error);
     r.readAsDataURL(file);
   });
+}
+
+function setPlanEditorStatus(message, isError = false) {
+  if (!els.planEditorStatus) return;
+  els.planEditorStatus.textContent = message;
+  els.planEditorStatus.style.color = isError ? "#9a3b3b" : "#5f564b";
+}
+
+function ensurePlanCanvas() {
+  if (sketchPlanState.fabricCanvas) return sketchPlanState.fabricCanvas;
+  if (!window.fabric || !els.planCanvas) return null;
+  const canvas = new window.fabric.Canvas("planCanvas", {
+    selection: true,
+    preserveObjectStacking: true,
+  });
+  sketchPlanState.fabricCanvas = canvas;
+
+  canvas.on("selection:created", (e) => handlePlanSelection(e.selected && e.selected[0]));
+  canvas.on("selection:updated", (e) => handlePlanSelection(e.selected && e.selected[0]));
+  canvas.on("selection:cleared", () => handlePlanSelection(null));
+  canvas.on("object:moving", (e) => syncZoneLabelForObject(e.target));
+  canvas.on("object:scaling", (e) => syncZoneLabelForObject(e.target));
+  canvas.on("object:rotating", (e) => syncZoneLabelForObject(e.target));
+  return canvas;
+}
+
+function resizePlanCanvasToWrap(widthPx, heightPx) {
+  const canvas = ensurePlanCanvas();
+  if (!canvas) return;
+  const wrapW = els.planCanvasWrap ? Math.max(320, els.planCanvasWrap.clientWidth - 2) : widthPx;
+  const ratio = widthPx / Math.max(1, heightPx);
+  const outW = Math.min(wrapW, widthPx);
+  const outH = Math.round(outW / Math.max(0.1, ratio));
+  canvas.setWidth(outW);
+  canvas.setHeight(outH);
+  canvas.renderAll();
+}
+
+function waitForCvReady(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const tick = () => {
+      if (window.cv && typeof window.cv.imread === "function" && typeof window.cv.Mat === "function") {
+        resolve(window.cv);
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error("OpenCV.js non disponibile."));
+        return;
+      }
+      setTimeout(tick, 120);
+    };
+    tick();
+  });
+}
+
+function loadImageElementFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Immagine non valida."));
+    };
+    img.src = url;
+  });
+}
+
+function loadImageElementFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Immagine non valida."));
+    img.src = dataUrl;
+  });
+}
+
+function handlePlanSelection(obj) {
+  sketchPlanState.selectedZone = obj && obj.customType === "zone" ? obj : null;
+  if (els.planZoneLabelInput) {
+    els.planZoneLabelInput.value = sketchPlanState.selectedZone ? String(sketchPlanState.selectedZone.zoneLabel || "") : "";
+  }
+}
+
+function syncZoneLabelForObject(obj) {
+  if (!obj || obj.customType !== "zone" || !obj.linkedLabel) return;
+  const label = obj.linkedLabel;
+  const center = obj.getCenterPoint();
+  label.set({
+    left: center.x,
+    top: center.y,
+    angle: obj.angle || 0,
+  });
+  label.setCoords();
+  const canvas = ensurePlanCanvas();
+  canvas?.renderAll();
+}
+
+function snapshotPlanBaseLayout() {
+  const canvas = ensurePlanCanvas();
+  if (!canvas) return;
+  sketchPlanState.baseSnapshot = canvas
+    .getObjects()
+    .filter((o) => o.customType !== "background")
+    .map((o) => ({
+      obj: o,
+      left: o.left,
+      top: o.top,
+      scaleX: o.scaleX || 1,
+      scaleY: o.scaleY || 1,
+    }));
+  sketchPlanState.globalScale = 1;
+  if (els.planGlobalScale) els.planGlobalScale.value = "100";
+}
+
+function applyGlobalPlanScale(factor) {
+  const canvas = ensurePlanCanvas();
+  if (!canvas) return;
+  const cx = canvas.getWidth() / 2;
+  const cy = canvas.getHeight() / 2;
+  sketchPlanState.baseSnapshot.forEach((entry) => {
+    const obj = entry.obj;
+    obj.set({
+      left: cx + (entry.left - cx) * factor,
+      top: cy + (entry.top - cy) * factor,
+      scaleX: entry.scaleX * factor,
+      scaleY: entry.scaleY * factor,
+    });
+    obj.setCoords();
+    syncZoneLabelForObject(obj);
+  });
+  sketchPlanState.globalScale = factor;
+  canvas.renderAll();
+}
+
+async function analyzeSketchToInteractivePlan(source) {
+  const canvas = ensurePlanCanvas();
+  if (!canvas) {
+    setPlanEditorStatus("Fabric.js non disponibile.", true);
+    return;
+  }
+  const cv = await waitForCvReady();
+  const img =
+    typeof source === "string"
+      ? await loadImageElementFromDataUrl(source)
+      : await loadImageElementFromFile(source);
+  const maxSide = 1200;
+  const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const workW = Math.max(640, Math.round(img.width * scale));
+  const workH = Math.max(420, Math.round(img.height * scale));
+  resizePlanCanvasToWrap(workW, workH);
+
+  const tmp = document.createElement("canvas");
+  tmp.width = workW;
+  tmp.height = workH;
+  const tctx = tmp.getContext("2d");
+  tctx.drawImage(img, 0, 0, workW, workH);
+
+  const src = cv.imread(tmp);
+  const gray = new cv.Mat();
+  const binary = new cv.Mat();
+  const lines = new cv.Mat();
+  const contours = new cv.MatVector();
+  const hierarchy = new cv.Mat();
+
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+  cv.GaussianBlur(gray, gray, new cv.Size(3, 3), 0, 0, cv.BORDER_DEFAULT);
+  cv.threshold(gray, binary, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+  cv.HoughLinesP(binary, lines, 1, Math.PI / 180, 55, 40, 10);
+  cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+  canvas.clear();
+  const bg = new window.fabric.Image(tmp, {
+    selectable: false,
+    evented: false,
+    opacity: 0.23,
+    left: 0,
+    top: 0,
+    customType: "background",
+  });
+  canvas.add(bg);
+
+  let lineCount = 0;
+  for (let i = 0; i < lines.rows; i += 1) {
+    const p = lines.data32S;
+    const x1 = p[i * 4 + 0];
+    const y1 = p[i * 4 + 1];
+    const x2 = p[i * 4 + 2];
+    const y2 = p[i * 4 + 3];
+    const wall = new window.fabric.Line([x1, y1, x2, y2], {
+      stroke: "#4b4136",
+      strokeWidth: 2,
+      selectable: true,
+      hasControls: true,
+      customType: "wall",
+    });
+    canvas.add(wall);
+    lineCount += 1;
+  }
+
+  let zoneCount = 0;
+  for (let i = 0; i < contours.size(); i += 1) {
+    const cnt = contours.get(i);
+    const area = cv.contourArea(cnt);
+    if (area < 1800 || area > workW * workH * 0.8) continue;
+    const peri = cv.arcLength(cnt, true);
+    const approx = new cv.Mat();
+    cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+    if (approx.rows < 4) {
+      approx.delete();
+      continue;
+    }
+    const points = [];
+    for (let j = 0; j < approx.rows; j += 1) {
+      points.push({ x: approx.data32S[j * 2], y: approx.data32S[j * 2 + 1] });
+    }
+    approx.delete();
+    const zone = new window.fabric.Polygon(points, {
+      fill: "rgba(140,105,30,0.14)",
+      stroke: "#8b6914",
+      strokeWidth: 2,
+      objectCaching: false,
+      customType: "zone",
+      zoneId: `z_${sketchPlanState.nextZoneId++}`,
+      zoneLabel: "",
+    });
+    canvas.add(zone);
+    zoneCount += 1;
+  }
+
+  src.delete();
+  gray.delete();
+  binary.delete();
+  lines.delete();
+  contours.delete();
+  hierarchy.delete();
+
+  if (els.planEditor) els.planEditor.hidden = false;
+  canvas.renderAll();
+  snapshotPlanBaseLayout();
+  setPlanEditorStatus(`Rilevamento completato: ${lineCount} linee e ${zoneCount} aree selezionabili.`);
 }
 
 function createPdfDocument(orientation = "portrait") {
@@ -2642,6 +3478,15 @@ if (els.exportMenuBtn && els.exportMenu) {
   });
 }
 
+if (els.exportMenu) {
+  els.exportMenu.addEventListener("click", (e) => {
+    const planBtn = e.target.closest("#exportPlanPdfBtn");
+    if (!planBtn) return;
+    e.preventDefault();
+    exportPlanPdf();
+  });
+}
+
 if (els.importMenuBtn && els.importMenu) {
   els.importMenuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -2656,22 +3501,24 @@ if (els.importJsonBtn && els.importInput) {
   });
 }
 
-if (els.dropdownBackdrop) {
-  els.dropdownBackdrop.addEventListener("click", () => {
-    closeAllDropdowns();
-  });
-}
-
 document.addEventListener("click", (e) => {
   const t = e.target;
+  if (t && t.closest && t.closest("[data-close-dropdown='true']")) {
+    closeAllDropdowns();
+    return;
+  }
+  if (els.tableActionsMenu && els.tableActionsMenu.contains(t)) return;
+  if (els.exportMenu && els.exportMenu.contains(t)) return;
+  if (els.importMenu && els.importMenu.contains(t)) return;
   if (els.tableActionsDropdown && els.tableActionsDropdown.contains(t)) return;
   if (els.exportDropdown && els.exportDropdown.contains(t)) return;
   if (els.importDropdown && els.importDropdown.contains(t)) return;
   closeAllDropdowns();
 });
 
-els.floorPlanInput.addEventListener("change", async (e) => {
-  const file = e.target.files && e.target.files[0];
+async function applyFloorPlanFromFileInput(inputEl) {
+  if (!inputEl) return;
+  const file = inputEl.files && inputEl.files[0];
   if (!file) return;
   try {
     state.floorPlanDataUrl = await readFileAsDataUrl(file);
@@ -2681,8 +3528,170 @@ els.floorPlanInput.addEventListener("change", async (e) => {
   } catch (_) {
     alert("Impossibile leggere il file. Prova con PNG o JPG.");
   }
-  e.target.value = "";
-});
+  inputEl.value = "";
+}
+
+function applyFloorPlanDataUrl(dataUrl) {
+  state.floorPlanDataUrl = dataUrl;
+  applyFloorPlanFromState();
+  renderFloorMarkers();
+  saveState();
+}
+
+async function openFloorCameraCapture() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (els.floorSketchInput) els.floorSketchInput.click();
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "camera-capture-overlay";
+  overlay.innerHTML = `
+    <div class="camera-capture-panel">
+      <div class="camera-capture-topbar">
+        <label class="camera-capture-device-label">
+          Fotocamera
+          <select class="camera-capture-device-select" data-role="camera-select"></select>
+        </label>
+      </div>
+      <video class="camera-capture-video" autoplay playsinline></video>
+      <div class="camera-capture-actions">
+        <button type="button" class="btn btn-secondary" data-action="cancel">Annulla</button>
+        <button type="button" class="btn btn-primary" data-action="shot">Scatta foto</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const video = overlay.querySelector("video");
+  const cameraSelect = overlay.querySelector("[data-role='camera-select']");
+  let stream = null;
+
+  const stopCurrentStream = () => {
+    if (!stream) return;
+    stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+  };
+
+  const startStream = async (deviceId = "") => {
+    stopCurrentStream();
+    const constraints = deviceId
+      ? { video: { deviceId: { exact: deviceId } }, audio: false }
+      : { video: { facingMode: { ideal: "environment" } }, audio: false };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+  };
+
+  const rearCameraScore = (label) => {
+    const txt = String(label || "").toLowerCase();
+    let score = 0;
+    if (/rear|back|environment|world|posteriore/.test(txt)) score += 4;
+    if (/front|user|anteriore|facetime/.test(txt)) score -= 4;
+    return score;
+  };
+
+  const loadDevices = async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices
+      .filter((d) => d.kind === "videoinput")
+      .sort((a, b) => rearCameraScore(b.label) - rearCameraScore(a.label));
+    cameraSelect.innerHTML = "";
+    cams.forEach((cam, idx) => {
+      const opt = document.createElement("option");
+      opt.value = cam.deviceId;
+      opt.textContent = cam.label || `Fotocamera ${idx + 1}`;
+      cameraSelect.appendChild(opt);
+    });
+    cameraSelect.hidden = cams.length <= 1;
+    const activeId = stream?.getVideoTracks()[0]?.getSettings()?.deviceId || "";
+    if (activeId) cameraSelect.value = activeId;
+    const preferred = cams.find((cam) => rearCameraScore(cam.label) > 0);
+    return { cams, preferredId: preferred ? preferred.deviceId : "" };
+  };
+
+  try {
+    await startStream();
+    const { cams, preferredId } = await loadDevices();
+    const activeId = stream?.getVideoTracks()[0]?.getSettings()?.deviceId || "";
+    if (preferredId && preferredId !== activeId && cams.length > 1) {
+      await startStream(preferredId);
+      await loadDevices();
+    }
+  } catch (_) {
+    overlay.remove();
+    if (els.floorSketchInput) els.floorSketchInput.click();
+    return;
+  }
+
+  const stopAndClose = () => {
+    stopCurrentStream();
+    overlay.remove();
+  };
+
+  cameraSelect?.addEventListener("change", async () => {
+    const nextId = cameraSelect.value;
+    if (!nextId) return;
+    try {
+      await startStream(nextId);
+      await loadDevices();
+    } catch (_) {
+      setPlanEditorStatus("Impossibile attivare la fotocamera selezionata.", true);
+    }
+  });
+
+  overlay.addEventListener("click", async (e) => {
+    const action = e.target && e.target.dataset ? e.target.dataset.action : "";
+    if (action === "cancel") {
+      stopAndClose();
+      return;
+    }
+    if (action !== "shot") return;
+
+    const canvas = document.createElement("canvas");
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      stopAndClose();
+      return;
+    }
+    ctx.drawImage(video, 0, 0, vw, vh);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+    applyFloorPlanDataUrl(dataUrl);
+    try {
+      setPlanEditorStatus("Analisi bozza in corso...");
+      await analyzeSketchToInteractivePlan(dataUrl);
+    } catch (_) {
+      setPlanEditorStatus("Piantina caricata, ma analisi interattiva non disponibile sul dispositivo.", true);
+    }
+    stopAndClose();
+  });
+}
+
+if (els.floorPlanInput) {
+  els.floorPlanInput.addEventListener("change", () => {
+    applyFloorPlanFromFileInput(els.floorPlanInput);
+  });
+}
+
+if (els.createFloorPlanBtn) {
+  els.createFloorPlanBtn.addEventListener("click", () => {
+    openPlanEditorModal();
+    setPlanEditorStatus("Editor griglia attivo: scegli modalita e disegna la sala con click o trascinamento.");
+  });
+}
+
+if (els.planEditorBackdrop) {
+  els.planEditorBackdrop.addEventListener("click", () => {
+    closePlanEditorModal();
+  });
+}
+
+if (els.planEditorCloseBtn) {
+  els.planEditorCloseBtn.addEventListener("click", () => {
+    closePlanEditorModal();
+  });
+}
 
 els.clearPlanBtn.addEventListener("click", () => {
   state.floorPlanDataUrl = "";
@@ -3053,13 +4062,24 @@ function initSegnatavoloModal() {
 }
 
 
-els.exportPlanPdfBtn.addEventListener("click", async () => {
+async function exportPlanPdf() {
   closeAllDropdowns();
   if (!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
     alert("Librerie PDF non disponibili.");
     return;
   }
+  const previousView = getCurrentMainAreaView();
   try {
+    if (previousView !== "map") {
+      setMainAreaView("map");
+      await waitForNextFrame();
+    }
+    await waitForFloorImageReady();
+    const rect = els.floorStage.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) {
+      alert("Impossibile esportare: area piantina non disponibile al momento.");
+      return;
+    }
     const canvas = await window.html2canvas(els.floorStage, {
       backgroundColor: "#ffffff",
       scale: 2,
@@ -3086,8 +4106,12 @@ els.exportPlanPdfBtn.addEventListener("click", async () => {
     pdf.save("piantina-tavoli.pdf");
   } catch (_) {
     alert("Errore durante l'esportazione PDF della piantina.");
+  } finally {
+    if (getCurrentMainAreaView() !== previousView) {
+      setMainAreaView(previousView);
+    }
   }
-});
+}
 
 els.importInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
@@ -3119,6 +4143,7 @@ els.importInput.addEventListener("change", (e) => {
 window.addEventListener("resize", () => {
   layoutMarkerNotes();
   updateCurrentTableContextUi();
+  fitPlanGridIntoA4();
 });
 
 if (els.tablesList) {
@@ -3127,6 +4152,10 @@ if (els.tablesList) {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (els.planEditorModal && !els.planEditorModal.hidden) {
+      closePlanEditorModal();
+      return;
+    }
     if (document.querySelector(".guest-row__sheet:not([hidden])")) {
       closeAllGuestOptionSheets();
       return;
@@ -3140,6 +4169,8 @@ document.addEventListener("keydown", (e) => {
 
 initSegnatavoloModal();
 loadState();
+ensureExportPlanPdfMenuItem();
+initGridPlanEditor();
 setMainAreaView("tables");
 els.eventName.value = state.eventName;
 applyFloorPlanFromState();
