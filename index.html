@@ -74,7 +74,6 @@
           </button>
         </div>
         <span class="table-count" id="tableCountLabel">0 tavoli</span>
-        <span class="current-table-badge" id="currentTableBadge" aria-live="polite">Tavolo —</span>
       </div>
     </div>
     <input type="file" id="importInput" accept="application/json,.json" hidden />
@@ -82,7 +81,6 @@
     <div class="dropdown-panels-root" aria-hidden="true">
       <div class="dropdown__panel dropdown__panel--wide" id="exportMenu" role="menu" hidden>
         <button type="button" class="dropdown__close" data-close-dropdown="true" aria-label="Chiudi menu">×</button>
-        <button type="button" class="dropdown__item" id="exportPlanPdfBtn" role="menuitem">Esporta piantina PDF</button>
         <button type="button" class="dropdown__item" id="exportGuestsBtn" role="menuitem">Esporta partecipanti A-Z PDF</button>
         <button type="button" class="dropdown__item" id="exportKitchenBtn" role="menuitem">Esporta riepilogo cucina PDF</button>
         <button type="button" class="dropdown__item" id="exportSegnatavoliBtn" role="menuitem">Segnatavoli A5 (anteprima e stile)</button>
@@ -108,28 +106,14 @@
       </section>
 
       <section class="panel panel--map" id="mapAreaPanel" aria-labelledby="map-heading" hidden>
-        <h2 id="map-heading">Piantina della sala</h2>
+        <h2 id="map-heading">Piantina</h2>
         <p class="hint">Carica l’immagine della piantina (PNG, JPG). I tavoli compaiono automaticamente: trascinali dove servono. Sotto il numero c’è il conteggio menù (es. 5A+2B); sotto ancora le allergie nello stesso formato del resoconto, senza ripetere il conteggio. Passa col mouse sul tavolo per il riepilogo completo.</p>
 
         <div class="map-toolbar">
-          <label class="btn btn-secondary file-label">
-            Carica piantina
-            <input type="file" id="floorPlanInput" accept="image/*" hidden />
-          </label>
-          <button type="button" class="btn btn-secondary" id="createFloorPlanBtn">Crea piantina</button>
-          <button type="button" class="btn btn-ghost" id="clearPlanBtn" title="Rimuovi solo l’immagine">Rimuovi immagine</button>
+          <button type="button" class="btn btn-secondary" id="addPlanPanelBtn">+ Riquadro piantina</button>
         </div>
 
-        <div class="floor-wrap" id="floorWrap">
-          <div class="floor-stage" id="floorStage">
-            <img class="floor-img" id="floorImg" alt="Piantina sala" hidden />
-            <div class="floor-hint" id="floorHint">
-              <p>Nessuna immagine caricata.</p>
-              <p class="small">Carica la piantina della sala oppure usa solo l’area grigia per posizionare i tavoli.</p>
-            </div>
-            <div class="floor-markers" id="floorMarkers"></div>
-          </div>
-        </div>
+        <div class="floor-plans-container" id="floorPlansContainer"></div>
       </section>
 
       <section class="panel panel--acceptance" id="acceptanceAreaPanel" aria-labelledby="acceptance-heading" hidden>
@@ -292,122 +276,6 @@
         <button type="button" class="btn btn-primary" id="segnatavoloExportConfirm">Scarica PDF tutti i tavoli</button>
         <button type="button" class="btn btn-secondary" id="segnatavoloModalCancel">Chiudi</button>
       </div>
-    </div>
-  </div>
-
-  <div class="plan-editor-modal" id="planEditorModal" hidden aria-hidden="true">
-    <div class="plan-editor-modal__backdrop" id="planEditorBackdrop"></div>
-    <div class="plan-editor-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="planEditorTitle">
-      <div class="plan-editor-modal__header">
-        <h2 id="planEditorTitle" class="plan-editor-modal__title">Crea piantina</h2>
-        <button type="button" class="btn btn-ghost btn-sm plan-editor-modal__close" id="planEditorCloseBtn" aria-label="Chiudi">×</button>
-      </div>
-      <div class="plan-editor" id="planEditor">
-        <div class="plan-setup-panel" id="planSetupPanel">
-          <div id="planSetupStepTileSize">
-            <h3 class="plan-setup-panel__title">Crea piantina</h3>
-            <p class="plan-setup-panel__text">Inserisci le dimensioni della mattonella in metri.</p>
-            <div class="plan-setup-form">
-              <label class="plan-input-mini">
-                Dim. orizzontale (m)
-                <input type="number" id="tileSizeXInput" min="0.1" max="10" step="0.05" value="0.6" />
-              </label>
-              <label class="plan-input-mini">
-                Dim. verticale (m)
-                <input type="number" id="tileSizeYInput" min="0.1" max="10" step="0.05" value="0.6" />
-              </label>
-            </div>
-            <div class="plan-setup-panel__actions">
-              <button type="button" class="btn btn-primary" id="planSetupGenerateBtn">Continua</button>
-            </div>
-          </div>
-
-          <div id="planSetupStepTilesCount" hidden>
-            <h3 class="plan-setup-panel__title">Numero mattonelle</h3>
-            <p class="plan-setup-panel__text">Quante mattonelle sul lato orizzontale e quante sul lato verticale?</p>
-            <div class="plan-setup-form">
-              <label class="plan-input-mini">
-                Mattonelle lato orizzontale
-                <input type="number" id="roomTilesXInput" min="1" max="120" step="1" value="7" />
-              </label>
-              <label class="plan-input-mini">
-                Mattonelle lato verticale
-                <input type="number" id="roomTilesYInput" min="1" max="120" step="1" value="8" />
-              </label>
-            </div>
-            <div class="plan-setup-panel__actions">
-              <button type="button" class="btn btn-primary" id="planSetupDrawGridLandscapeBtn">Disegna griglia su foglio A4 orizzontale</button>
-              <button type="button" class="btn btn-primary" id="planSetupDrawGridPortraitBtn">Disegna griglia su foglio A4 verticale</button>
-            </div>
-          </div>
-        </div>
-        <div class="plan-editor__body" id="planEditorBody" hidden>
-          <div class="plan-editor__toolbar">
-            <button type="button" class="btn btn-secondary btn-sm" id="planZoomOutBtn" aria-label="Riduci zoom">-</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="planZoomResetBtn">100%</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="planZoomInBtn" aria-label="Aumenta zoom">+</button>
-            <span class="plan-editor__status" id="planEditorStatus">Doppio click su una mattonella per aprire il menu.</span>
-          </div>
-          <div class="plan-editor__summary" id="planGridSummary">Griglia: --</div>
-          <div class="plan-a4-stage" id="planA4Stage">
-            <div class="plan-a4-sheet" id="planA4Sheet">
-              <div class="plan-grid-wrap" id="planGridWrap">
-                <div class="plan-grid" id="planGrid"></div>
-                <svg class="plan-overlay" id="planOverlay" viewBox="0 0 1000 1414" preserveAspectRatio="none"></svg>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="plan-cell-menu" id="planCellMenu" hidden>
-    <button type="button" class="plan-cell-menu__item" data-plan-action="add-tiles">Aggiungi gruppo mattonelle</button>
-    <button type="button" class="plan-cell-menu__item" data-plan-action="select-nodes">Disegna segmento</button>
-  </div>
-  <div class="plan-node-picker" id="planNodePicker" hidden>
-    <div class="plan-node-picker__header">
-      <span id="planNodePickerTitle">Seleziona nodo</span>
-      <button type="button" class="plan-node-picker__close" id="planNodePickerCloseBtn" aria-label="Chiudi">×</button>
-    </div>
-    <div class="plan-node-picker__grid" id="planNodePickerGrid"></div>
-  </div>
-  <div class="plan-add-tiles-dialog" id="planAddTilesDialog" hidden>
-    <h3 class="plan-add-tiles-dialog__title">Aggiungi gruppo mattonelle</h3>
-    <div class="plan-setup-form">
-      <label class="plan-input-mini">
-        Dim. mattonella X (m)
-        <input type="number" id="planAddTileSizeXInput" min="0.1" max="10" step="0.05" value="0.6" />
-      </label>
-      <label class="plan-input-mini">
-        Dim. mattonella Y (m)
-        <input type="number" id="planAddTileSizeYInput" min="0.1" max="10" step="0.05" value="0.6" />
-      </label>
-      <label class="plan-input-mini">
-        Mattonelle orizzontali
-        <input type="number" id="planAddTilesWidthInput" min="1" max="120" step="1" value="3" />
-      </label>
-      <label class="plan-input-mini">
-        Mattonelle verticali
-        <input type="number" id="planAddTilesHeightInput" min="1" max="120" step="1" value="5" />
-      </label>
-      <label class="plan-input-mini">
-        Direzione
-        <select id="planAddTilesDirectionSelect">
-          <option value="alto">Alto</option>
-          <option value="basso">Basso</option>
-          <option value="sinistra">Sinistra</option>
-          <option value="destra" selected>Destra</option>
-          <option value="alto/sinistra">Alto/Sinistra</option>
-          <option value="alto/destra">Alto/Destra</option>
-          <option value="basso/sinistra">Basso/Sinistra</option>
-          <option value="basso/destra">Basso/Destra</option>
-        </select>
-      </label>
-    </div>
-    <div class="plan-setup-panel__actions">
-      <button type="button" class="btn btn-secondary btn-sm" id="planAddTilesCancelBtn">Annulla</button>
-      <button type="button" class="btn btn-primary btn-sm" id="planAddTilesApplyBtn">Applica</button>
     </div>
   </div>
 
