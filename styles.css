@@ -1837,8 +1837,9 @@ select:focus {
   }
 
   .panel--studio {
-    min-height: calc(100dvh - 6rem);
+    min-height: auto;
     max-height: none;
+    overflow: visible;
   }
 
   .studio-dd__panel,
@@ -1857,15 +1858,27 @@ select:focus {
 
   .studio-reset__grid {
     grid-template-columns: 1fr;
+    flex: 0 0 auto;
+    min-height: auto;
   }
 
   .studio-reset__controls {
     overflow: visible;
+    max-height: none;
     padding-right: 0;
   }
 
   .studio-canvas--controls {
     grid-template-columns: 1fr;
+  }
+
+  .studio-output-card {
+    min-height: auto;
+  }
+
+  .studio-output-card .studio-canvas {
+    min-height: 260px;
+    overflow: visible;
   }
 }
 
