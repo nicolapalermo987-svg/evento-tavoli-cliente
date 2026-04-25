@@ -3770,11 +3770,39 @@ if (els.topActionsMenu) {
 }
 
 let pendingImportKind = "";
+const CLIENT_FILE_EXT = ".evtcliente";
+const FULL_FILE_EXT = ".evtstruttura";
+
+function formatExportTimestampForFile() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}${mm}${dd}-${hh}${mi}`;
+}
+
+function getImportAcceptByKind(kind) {
+  return kind === "cliente"
+    ? `${CLIENT_FILE_EXT},application/json,.json`
+    : `${FULL_FILE_EXT},application/json,.json`;
+}
+
+function fileLooksLikeExpectedKind(fileName, kind) {
+  const name = String(fileName || "").toLowerCase();
+  if (kind === "cliente") {
+    return name.endsWith(CLIENT_FILE_EXT) || name.endsWith(".json");
+  }
+  return name.endsWith(FULL_FILE_EXT) || name.endsWith(".json");
+}
 
 function promptImport(kind) {
   if (!els.importInput) return;
   pendingImportKind = kind;
   closeAllDropdowns();
+  els.importInput.setAttribute("accept", getImportAcceptByKind(kind));
   els.importInput.click();
 }
 
@@ -3964,7 +3992,8 @@ if (els.exportClientBtn) {
   els.exportClientBtn.addEventListener("click", () => {
     if (appRole === "staff") return;
     closeAllDropdowns();
-    downloadJsonFile("evento-tavoli-cliente.json", buildClientExportPayload());
+    const stamp = formatExportTimestampForFile();
+    downloadJsonFile(`evento-tavoli-cliente-${stamp}${CLIENT_FILE_EXT}`, buildClientExportPayload());
   });
 }
 
@@ -3972,7 +4001,8 @@ if (els.exportFullBtn) {
   els.exportFullBtn.addEventListener("click", () => {
     if (appRole !== "struttura") return;
     closeAllDropdowns();
-    downloadJsonFile("evento-tavoli-struttura-completo.json", buildFullExportPayload());
+    const stamp = formatExportTimestampForFile();
+    downloadJsonFile(`evento-tavoli-struttura-${stamp}${FULL_FILE_EXT}`, buildFullExportPayload());
   });
 }
 
@@ -5080,6 +5110,16 @@ els.importInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
   const kind = pendingImportKind || "";
+  if (kind && !fileLooksLikeExpectedKind(file.name, kind)) {
+    alert(
+      kind === "cliente"
+        ? `Formato file non coerente. Seleziona un file ${CLIENT_FILE_EXT} (oppure un .json valido).`
+        : `Formato file non coerente. Seleziona un file ${FULL_FILE_EXT} (oppure un .json valido).`
+    );
+    pendingImportKind = "";
+    e.target.value = "";
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
