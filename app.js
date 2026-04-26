@@ -5,6 +5,7 @@
 
 const MAX_GUESTS = 9;
 const STORAGE_KEY_BASE = "evento-tavoli-v1";
+const RECENT_IMPORTS_KEY_BASE = "evento-tavoli-recent-imports-v1";
 
 const state = {
   eventName: "",
@@ -27,6 +28,93 @@ const appRole = APP_ROLES.includes(DISTRIBUTION_ROLE_RAW) ? DISTRIBUTION_ROLE_RA
 
 function getStateStorageKey() {
   return `${STORAGE_KEY_BASE}-${appRole}`;
+}
+
+function getRecentImportsStorageKey() {
+  return `${RECENT_IMPORTS_KEY_BASE}-${appRole}`;
+}
+
+function loadRecentImports() {
+  try {
+    const raw = localStorage.getItem(getRecentImportsStorageKey());
+    const list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) return [];
+    return list.filter((x) => x && typeof x === "object" && x.id && x.data).slice(0, 12);
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveRecentImports(list) {
+  try {
+    localStorage.setItem(getRecentImportsStorageKey(), JSON.stringify(list.slice(0, 12)));
+  } catch (_) {}
+}
+
+function addRecentImportEntry(fileName, kind, parsedRoot, normalizedData) {
+  const row = {
+    id: uid(),
+    fileName: String(fileName || "file-importato"),
+    kind: kind === "completo" ? "completo" : "cliente",
+    fileType: String((parsedRoot && parsedRoot.fileType) || ""),
+    importedAt: new Date().toISOString(),
+    data: normalizedData,
+  };
+  const list = loadRecentImports();
+  list.unshift(row);
+  // Deduplica per nome file recente mantenendo il più nuovo.
+  const seen = new Set();
+  const unique = [];
+  for (const item of list) {
+    const key = `${item.kind}\0${String(item.fileName || "").toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+    if (unique.length >= 12) break;
+  }
+  saveRecentImports(unique);
+}
+
+function closeRecentImportsModal() {
+  if (!els.recentImportsModal) return;
+  els.recentImportsModal.hidden = true;
+  els.recentImportsModal.setAttribute("aria-hidden", "true");
+}
+
+function openRecentImportsModal() {
+  if (!els.recentImportsModal || !els.recentImportsList) return;
+  const list = loadRecentImports();
+  els.recentImportsList.innerHTML = "";
+  if (!list.length) {
+    const empty = document.createElement("div");
+    empty.className = "menu-booklet-empty";
+    empty.textContent = "Nessun file recente disponibile.";
+    els.recentImportsList.appendChild(empty);
+  } else {
+    list.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "recent-imports-row";
+      const title = document.createElement("div");
+      title.className = "recent-imports-row__title";
+      title.textContent = entry.fileName;
+      const meta = document.createElement("div");
+      meta.className = "recent-imports-row__meta";
+      const kindLabel = entry.kind === "completo" ? "Struttura completo" : "Cliente";
+      meta.textContent = `${kindLabel} • ${new Date(entry.importedAt || Date.now()).toLocaleString("it-IT")}`;
+      const actions = document.createElement("div");
+      actions.className = "recent-imports-row__actions";
+      actions.innerHTML = `
+        <button type="button" class="btn btn-primary btn-sm" data-open-recent="${entry.id}">Apri</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-remove-recent="${entry.id}">Rimuovi</button>
+      `;
+      row.appendChild(title);
+      row.appendChild(meta);
+      row.appendChild(actions);
+      els.recentImportsList.appendChild(row);
+    });
+  }
+  els.recentImportsModal.hidden = false;
+  els.recentImportsModal.setAttribute("aria-hidden", "false");
 }
 
 function canAccessArea(view) {
@@ -85,6 +173,7 @@ const els = {
   dropdownBackdrop: document.getElementById("dropdownBackdrop"),
   importClientBtn: document.getElementById("importClientBtn"),
   importFullBtn: document.getElementById("importFullBtn"),
+  openRecentImportsBtn: document.getElementById("openRecentImportsBtn"),
   addPlanPanelBtn: document.getElementById("addPlanPanelBtn"),
   floorPlansContainer: document.getElementById("floorPlansContainer"),
   exportGuestsBtn: document.getElementById("exportGuestsBtn"),
@@ -136,6 +225,10 @@ const els = {
   menuBookletPreviewLogo: document.getElementById("menuBookletPreviewLogo"),
   menuBookletPreviewEvent: document.getElementById("menuBookletPreviewEvent"),
   menuBookletPreviewList: document.getElementById("menuBookletPreviewList"),
+  recentImportsModal: document.getElementById("recentImportsModal"),
+  recentImportsBackdrop: document.getElementById("recentImportsBackdrop"),
+  recentImportsCloseBtn: document.getElementById("recentImportsCloseBtn"),
+  recentImportsList: document.getElementById("recentImportsList"),
 };
 
 function createEmptyGuest() {
@@ -3818,6 +3911,37 @@ if (els.importFullBtn && els.importInput) {
     promptImport("completo");
   });
 }
+if (els.openRecentImportsBtn) {
+  els.openRecentImportsBtn.addEventListener("click", () => {
+    closeAllDropdowns();
+    openRecentImportsModal();
+  });
+}
+if (els.recentImportsCloseBtn) {
+  els.recentImportsCloseBtn.addEventListener("click", () => closeRecentImportsModal());
+}
+if (els.recentImportsBackdrop) {
+  els.recentImportsBackdrop.addEventListener("click", () => closeRecentImportsModal());
+}
+if (els.recentImportsList) {
+  els.recentImportsList.addEventListener("click", (e) => {
+    const openBtn = e.target.closest("[data-open-recent]");
+    if (openBtn) {
+      const id = openBtn.dataset.openRecent;
+      const list = loadRecentImports();
+      const entry = list.find((x) => x.id === id);
+      if (entry) openRecentImportEntry(entry);
+      return;
+    }
+    const removeBtn = e.target.closest("[data-remove-recent]");
+    if (removeBtn) {
+      const id = removeBtn.dataset.removeRecent;
+      const list = loadRecentImports().filter((x) => x.id !== id);
+      saveRecentImports(list);
+      openRecentImportsModal();
+    }
+  });
+}
 
 document.addEventListener("click", (e) => {
   const t = e.target;
@@ -5106,6 +5230,32 @@ function applyFullProjectData(fullData) {
   saveState();
 }
 
+function openRecentImportEntry(entry) {
+  if (!entry || !entry.data) return;
+  if (entry.kind === "cliente") {
+    if (appRole === "staff") {
+      alert("La versione Staff non può importare file Cliente.");
+      return;
+    }
+    if (appRole === "struttura") {
+      if (!window.confirm("Aprire questo file Cliente come nuovo progetto? I dati progetto attuali verranno sostituiti.")) return;
+      applyClientProjectData(entry.data, true);
+    } else {
+      applyClientProjectData(entry.data, false);
+    }
+    closeRecentImportsModal();
+    return;
+  }
+  if (entry.kind === "completo") {
+    if (appRole === "cliente") {
+      alert("La versione Cliente non può importare file Struttura completo.");
+      return;
+    }
+    applyFullProjectData(entry.data);
+    closeRecentImportsModal();
+  }
+}
+
 els.importInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -5137,12 +5287,14 @@ els.importInput.addEventListener("change", (e) => {
         } else {
           applyClientProjectData(data, false);
         }
+        addRecentImportEntry(file.name, "cliente", parsed, data);
       } else if (kind === "completo") {
         if (fileType && fileType !== "struttura") {
           alert("Questo non è un file Struttura completo.");
           return;
         }
         applyFullProjectData(data);
+        addRecentImportEntry(file.name, "completo", parsed, data);
       } else {
         alert("Seleziona prima il tipo di importazione dal menu.");
       }
@@ -5173,6 +5325,10 @@ if (els.tablesList) {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    if (els.recentImportsModal && !els.recentImportsModal.hidden) {
+      closeRecentImportsModal();
+      return;
+    }
     if (document.querySelector(".guest-row__sheet:not([hidden])")) {
       closeAllGuestOptionSheets();
       return;

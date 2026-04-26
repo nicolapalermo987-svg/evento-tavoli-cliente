@@ -2672,3 +2672,44 @@ select:focus {
   text-align: center;
   background: #fffdfa;
 }
+
+.recent-imports-modal {
+  width: min(720px, calc(100vw - 1.5rem));
+}
+
+.recent-imports-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: min(60vh, 420px);
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.recent-imports-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.55rem 0.6rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.recent-imports-row__title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-imports-row__meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.recent-imports-row__actions {
+  display: flex;
+  gap: 0.38rem;
+  flex-wrap: wrap;
+}

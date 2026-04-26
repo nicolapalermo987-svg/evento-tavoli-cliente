@@ -88,6 +88,7 @@
         <div class="top-actions-submenu" data-submenu="import" hidden>
           <button type="button" class="dropdown__item" id="importClientBtn" role="menuitem">Importa file Cliente</button>
           <button type="button" class="dropdown__item" id="importFullBtn" role="menuitem">Importa file Struttura (completo)</button>
+          <button type="button" class="dropdown__item" id="openRecentImportsBtn" role="menuitem">Apri recenti importati</button>
         </div>
       </div>
       <div class="dropdown__panel" id="tableActionsMenu" role="menu" hidden>
@@ -331,6 +332,20 @@
     </footer>
   </div>
 
+  <div class="modal" id="recentImportsModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" id="recentImportsBackdrop"></div>
+    <div class="modal__dialog recent-imports-modal" role="dialog" aria-modal="true" aria-labelledby="recentImportsHeading">
+      <header class="modal__header">
+        <h2 id="recentImportsHeading">Apri recenti importati</h2>
+        <button type="button" class="btn btn-ghost btn-sm" id="recentImportsCloseBtn" aria-label="Chiudi">Chiudi</button>
+      </header>
+      <div class="modal__body">
+        <p class="studio-block__hint">Seleziona un file importato di recente e riaprilo senza cercarlo nel telefono.</p>
+        <div class="recent-imports-list" id="recentImportsList"></div>
+      </div>
+    </div>
+  </div>
+
   <template id="tableCardTpl">
     <article class="table-card" data-table-id="">
       <div class="table-card__top">
@@ -397,6 +412,6 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="role-config.js"></script>
-  <script src="app.js?v=20260425a"></script>
+  <script src="app.js?v=20260426a"></script>
 </body>
 </html>
