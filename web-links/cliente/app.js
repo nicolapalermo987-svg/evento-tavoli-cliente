@@ -830,7 +830,7 @@ function applyRoleUi() {
   if (els.openSegnatavoloAreaBtn) els.openSegnatavoloAreaBtn.hidden = appRole === "cliente";
   if (els.openMenuBookletAreaBtn) els.openMenuBookletAreaBtn.hidden = appRole === "cliente";
 
-  if (els.exportGuestsBtn) els.exportGuestsBtn.hidden = appRole !== "struttura";
+  if (els.exportGuestsBtn) els.exportGuestsBtn.hidden = false;
   if (els.exportKitchenBtn) els.exportKitchenBtn.hidden = appRole !== "struttura";
   if (els.exportTablesListBtn) els.exportTablesListBtn.hidden = false;
   if (els.exportClientBtn) els.exportClientBtn.hidden = appRole === "staff";
