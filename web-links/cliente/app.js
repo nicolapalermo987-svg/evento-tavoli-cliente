@@ -5,7 +5,6 @@
 
 const MAX_GUESTS = 9;
 const STORAGE_KEY_BASE = "evento-tavoli-v1";
-const RECENT_IMPORTS_KEY_BASE = "evento-tavoli-recent-imports-v1";
 
 const state = {
   eventName: "",
@@ -23,98 +22,44 @@ const acceptanceUiState = {
 };
 
 const APP_ROLES = ["cliente", "struttura", "staff"];
-const DISTRIBUTION_ROLE_RAW = String(window.APP_DISTRIBUTION_ROLE || "struttura").trim().toLowerCase();
-const appRole = APP_ROLES.includes(DISTRIBUTION_ROLE_RAW) ? DISTRIBUTION_ROLE_RAW : "struttura";
+const LOGIN_SESSION_ROLE_KEY = "evento-tavoli-session-role-v1";
+const LOGIN_PASSWORD_TO_ROLE = {
+  cliente: "cliente",
+  roga: "struttura",
+  staff: "staff",
+};
+
+function resolveRoleFromSimpleLogin() {
+  try {
+    const existing = String(sessionStorage.getItem(LOGIN_SESSION_ROLE_KEY) || "").trim().toLowerCase();
+    if (APP_ROLES.includes(existing)) return existing;
+  } catch (_) {}
+
+  while (true) {
+    const raw = window.prompt("Accesso Evento Tavoli\nInserisci password:", "");
+    if (raw === null) {
+      alert("Accesso annullato. Riapri la pagina per entrare.");
+      return null;
+    }
+    const key = String(raw).trim().toLowerCase();
+    const role = LOGIN_PASSWORD_TO_ROLE[key];
+    if (role) {
+      try {
+        sessionStorage.setItem(LOGIN_SESSION_ROLE_KEY, role);
+      } catch (_) {}
+      return role;
+    }
+    alert("Password non valida.");
+  }
+}
+
+const appRole = resolveRoleFromSimpleLogin();
+if (!appRole) {
+  throw new Error("Accesso non completato.");
+}
 
 function getStateStorageKey() {
   return `${STORAGE_KEY_BASE}-${appRole}`;
-}
-
-function getRecentImportsStorageKey() {
-  return `${RECENT_IMPORTS_KEY_BASE}-${appRole}`;
-}
-
-function loadRecentImports() {
-  try {
-    const raw = localStorage.getItem(getRecentImportsStorageKey());
-    const list = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(list)) return [];
-    return list.filter((x) => x && typeof x === "object" && x.id && x.data).slice(0, 12);
-  } catch (_) {
-    return [];
-  }
-}
-
-function saveRecentImports(list) {
-  try {
-    localStorage.setItem(getRecentImportsStorageKey(), JSON.stringify(list.slice(0, 12)));
-  } catch (_) {}
-}
-
-function addRecentImportEntry(fileName, kind, parsedRoot, normalizedData) {
-  const row = {
-    id: uid(),
-    fileName: String(fileName || "file-importato"),
-    kind: kind === "completo" ? "completo" : "cliente",
-    fileType: String((parsedRoot && parsedRoot.fileType) || ""),
-    importedAt: new Date().toISOString(),
-    data: normalizedData,
-  };
-  const list = loadRecentImports();
-  list.unshift(row);
-  // Deduplica per nome file recente mantenendo il più nuovo.
-  const seen = new Set();
-  const unique = [];
-  for (const item of list) {
-    const key = `${item.kind}\0${String(item.fileName || "").toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(item);
-    if (unique.length >= 12) break;
-  }
-  saveRecentImports(unique);
-}
-
-function closeRecentImportsModal() {
-  if (!els.recentImportsModal) return;
-  els.recentImportsModal.hidden = true;
-  els.recentImportsModal.setAttribute("aria-hidden", "true");
-}
-
-function openRecentImportsModal() {
-  if (!els.recentImportsModal || !els.recentImportsList) return;
-  const list = loadRecentImports();
-  els.recentImportsList.innerHTML = "";
-  if (!list.length) {
-    const empty = document.createElement("div");
-    empty.className = "menu-booklet-empty";
-    empty.textContent = "Nessun file recente disponibile.";
-    els.recentImportsList.appendChild(empty);
-  } else {
-    list.forEach((entry) => {
-      const row = document.createElement("div");
-      row.className = "recent-imports-row";
-      const title = document.createElement("div");
-      title.className = "recent-imports-row__title";
-      title.textContent = entry.fileName;
-      const meta = document.createElement("div");
-      meta.className = "recent-imports-row__meta";
-      const kindLabel = entry.kind === "completo" ? "Struttura completo" : "Cliente";
-      meta.textContent = `${kindLabel} • ${new Date(entry.importedAt || Date.now()).toLocaleString("it-IT")}`;
-      const actions = document.createElement("div");
-      actions.className = "recent-imports-row__actions";
-      actions.innerHTML = `
-        <button type="button" class="btn btn-primary btn-sm" data-open-recent="${entry.id}">Apri</button>
-        <button type="button" class="btn btn-ghost btn-sm" data-remove-recent="${entry.id}">Rimuovi</button>
-      `;
-      row.appendChild(title);
-      row.appendChild(meta);
-      row.appendChild(actions);
-      els.recentImportsList.appendChild(row);
-    });
-  }
-  els.recentImportsModal.hidden = false;
-  els.recentImportsModal.setAttribute("aria-hidden", "false");
 }
 
 function canAccessArea(view) {
@@ -171,9 +116,8 @@ const els = {
   topActionsMenuBtn: document.getElementById("topActionsMenuBtn"),
   topActionsMenu: document.getElementById("topActionsMenu"),
   dropdownBackdrop: document.getElementById("dropdownBackdrop"),
-  importClientBtn: document.getElementById("importClientBtn"),
-  importFullBtn: document.getElementById("importFullBtn"),
-  openRecentImportsBtn: document.getElementById("openRecentImportsBtn"),
+  importFileBtn: document.getElementById("importFileBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
   addPlanPanelBtn: document.getElementById("addPlanPanelBtn"),
   floorPlansContainer: document.getElementById("floorPlansContainer"),
   exportGuestsBtn: document.getElementById("exportGuestsBtn"),
@@ -225,10 +169,6 @@ const els = {
   menuBookletPreviewLogo: document.getElementById("menuBookletPreviewLogo"),
   menuBookletPreviewEvent: document.getElementById("menuBookletPreviewEvent"),
   menuBookletPreviewList: document.getElementById("menuBookletPreviewList"),
-  recentImportsModal: document.getElementById("recentImportsModal"),
-  recentImportsBackdrop: document.getElementById("recentImportsBackdrop"),
-  recentImportsCloseBtn: document.getElementById("recentImportsCloseBtn"),
-  recentImportsList: document.getElementById("recentImportsList"),
 };
 
 function createEmptyGuest() {
@@ -893,8 +833,7 @@ function applyRoleUi() {
   if (els.exportKitchenBtn) els.exportKitchenBtn.hidden = appRole !== "struttura";
   if (els.exportClientBtn) els.exportClientBtn.hidden = appRole === "staff";
   if (els.exportFullBtn) els.exportFullBtn.hidden = appRole !== "struttura";
-  if (els.importClientBtn) els.importClientBtn.hidden = appRole === "staff";
-  if (els.importFullBtn) els.importFullBtn.hidden = appRole === "cliente";
+  if (els.importFileBtn) els.importFileBtn.hidden = false;
 
   if (els.eventName) els.eventName.disabled = !canEditEventName();
   setPanelEditable(els.tablesAreaPanel, canEditTablesArea());
@@ -3877,69 +3816,26 @@ function formatExportTimestampForFile() {
   return `${yyyy}${mm}${dd}-${hh}${mi}`;
 }
 
-function getImportAcceptByKind(kind) {
-  return kind === "cliente"
-    ? `${CLIENT_FILE_EXT},application/json,.json`
-    : `${FULL_FILE_EXT},application/json,.json`;
-}
-
-function fileLooksLikeExpectedKind(fileName, kind) {
-  const name = String(fileName || "").toLowerCase();
-  if (kind === "cliente") {
-    return name.endsWith(CLIENT_FILE_EXT) || name.endsWith(".json");
-  }
-  return name.endsWith(FULL_FILE_EXT) || name.endsWith(".json");
-}
-
 function promptImport(kind) {
   if (!els.importInput) return;
   pendingImportKind = kind;
   closeAllDropdowns();
-  els.importInput.setAttribute("accept", getImportAcceptByKind(kind));
+  els.importInput.setAttribute("accept", "*/*");
   els.importInput.click();
 }
 
-if (els.importClientBtn && els.importInput) {
-  els.importClientBtn.addEventListener("click", () => {
-    if (appRole === "staff") return;
-    promptImport("cliente");
+if (els.importFileBtn && els.importInput) {
+  els.importFileBtn.addEventListener("click", () => {
+    promptImport("auto");
   });
 }
-if (els.importFullBtn && els.importInput) {
-  els.importFullBtn.addEventListener("click", () => {
-    if (appRole === "cliente") return;
-    promptImport("completo");
-  });
-}
-if (els.openRecentImportsBtn) {
-  els.openRecentImportsBtn.addEventListener("click", () => {
+if (els.logoutBtn) {
+  els.logoutBtn.addEventListener("click", () => {
     closeAllDropdowns();
-    openRecentImportsModal();
-  });
-}
-if (els.recentImportsCloseBtn) {
-  els.recentImportsCloseBtn.addEventListener("click", () => closeRecentImportsModal());
-}
-if (els.recentImportsBackdrop) {
-  els.recentImportsBackdrop.addEventListener("click", () => closeRecentImportsModal());
-}
-if (els.recentImportsList) {
-  els.recentImportsList.addEventListener("click", (e) => {
-    const openBtn = e.target.closest("[data-open-recent]");
-    if (openBtn) {
-      const id = openBtn.dataset.openRecent;
-      const list = loadRecentImports();
-      const entry = list.find((x) => x.id === id);
-      if (entry) openRecentImportEntry(entry);
-      return;
-    }
-    const removeBtn = e.target.closest("[data-remove-recent]");
-    if (removeBtn) {
-      const id = removeBtn.dataset.removeRecent;
-      const list = loadRecentImports().filter((x) => x.id !== id);
-      saveRecentImports(list);
-      openRecentImportsModal();
-    }
+    try {
+      sessionStorage.removeItem(LOGIN_SESSION_ROLE_KEY);
+    } catch (_) {}
+    window.location.reload();
   });
 }
 
@@ -4081,6 +3977,24 @@ function downloadJsonFile(filename, payload) {
   URL.revokeObjectURL(a.href);
 }
 
+function sanitizeExportBaseName(value, fallback) {
+  const trimmed = String(value || "").trim();
+  const source = trimmed || String(fallback || "");
+  const withoutExt = source.replace(/\.[^./\\]+$/g, "");
+  const safe = withoutExt
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return safe || String(fallback || "export");
+}
+
+function askExportFileName(defaultBaseName, extension) {
+  const raw = window.prompt("Nome file (senza estensione):", defaultBaseName);
+  if (raw === null) return null;
+  const safeBaseName = sanitizeExportBaseName(raw, defaultBaseName);
+  return `${safeBaseName}${extension}`;
+}
+
 function buildClientExportPayload() {
   return {
     app: "evento-tavoli",
@@ -4117,7 +4031,10 @@ if (els.exportClientBtn) {
     if (appRole === "staff") return;
     closeAllDropdowns();
     const stamp = formatExportTimestampForFile();
-    downloadJsonFile(`evento-tavoli-cliente-${stamp}${CLIENT_FILE_EXT}`, buildClientExportPayload());
+    const defaultBaseName = `evento-tavoli-cliente-${stamp}`;
+    const fileName = askExportFileName(defaultBaseName, CLIENT_FILE_EXT);
+    if (!fileName) return;
+    downloadJsonFile(fileName, buildClientExportPayload());
   });
 }
 
@@ -4126,7 +4043,10 @@ if (els.exportFullBtn) {
     if (appRole !== "struttura") return;
     closeAllDropdowns();
     const stamp = formatExportTimestampForFile();
-    downloadJsonFile(`evento-tavoli-struttura-${stamp}${FULL_FILE_EXT}`, buildFullExportPayload());
+    const defaultBaseName = `evento-tavoli-struttura-${stamp}`;
+    const fileName = askExportFileName(defaultBaseName, FULL_FILE_EXT);
+    if (!fileName) return;
+    downloadJsonFile(fileName, buildFullExportPayload());
   });
 }
 
@@ -5230,55 +5150,24 @@ function applyFullProjectData(fullData) {
   saveState();
 }
 
-function openRecentImportEntry(entry) {
-  if (!entry || !entry.data) return;
-  if (entry.kind === "cliente") {
-    if (appRole === "staff") {
-      alert("La versione Staff non può importare file Cliente.");
-      return;
-    }
-    if (appRole === "struttura") {
-      if (!window.confirm("Aprire questo file Cliente come nuovo progetto? I dati progetto attuali verranno sostituiti.")) return;
-      applyClientProjectData(entry.data, true);
-    } else {
-      applyClientProjectData(entry.data, false);
-    }
-    closeRecentImportsModal();
-    return;
-  }
-  if (entry.kind === "completo") {
-    if (appRole === "cliente") {
-      alert("La versione Cliente non può importare file Struttura completo.");
-      return;
-    }
-    applyFullProjectData(entry.data);
-    closeRecentImportsModal();
-  }
-}
-
 els.importInput.addEventListener("change", (e) => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
   const kind = pendingImportKind || "";
-  if (kind && !fileLooksLikeExpectedKind(file.name, kind)) {
-    alert(
-      kind === "cliente"
-        ? `Formato file non coerente. Seleziona un file ${CLIENT_FILE_EXT} (oppure un .json valido).`
-        : `Formato file non coerente. Seleziona un file ${FULL_FILE_EXT} (oppure un .json valido).`
-    );
-    pendingImportKind = "";
-    e.target.value = "";
-    return;
-  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const parsed = JSON.parse(reader.result);
       const fileType = parsed && parsed.fileType;
       const data = parsed && parsed.data ? parsed.data : parsed;
-      if (kind === "cliente") {
+      const resolvedKind = kind === "auto" ? (fileType === "struttura" ? "completo" : "cliente") : kind;
+      if (resolvedKind === "cliente") {
         if (fileType && fileType !== "cliente") {
           alert("Questo non è un file Cliente.");
+          return;
+        }
+        if (appRole === "staff") {
+          alert("La versione Staff non può importare file Cliente.");
           return;
         }
         if (appRole === "struttura") {
@@ -5287,16 +5176,18 @@ els.importInput.addEventListener("change", (e) => {
         } else {
           applyClientProjectData(data, false);
         }
-        addRecentImportEntry(file.name, "cliente", parsed, data);
-      } else if (kind === "completo") {
+      } else if (resolvedKind === "completo") {
         if (fileType && fileType !== "struttura") {
           alert("Questo non è un file Struttura completo.");
           return;
         }
+        if (appRole === "cliente") {
+          alert("La versione Cliente non può importare file Struttura completo.");
+          return;
+        }
         applyFullProjectData(data);
-        addRecentImportEntry(file.name, "completo", parsed, data);
       } else {
-        alert("Seleziona prima il tipo di importazione dal menu.");
+        alert("Formato file non riconosciuto.");
       }
     } catch (_) {
       alert("File JSON non valido.");
@@ -5325,10 +5216,6 @@ if (els.tablesList) {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (els.recentImportsModal && !els.recentImportsModal.hidden) {
-      closeRecentImportsModal();
-      return;
-    }
     if (document.querySelector(".guest-row__sheet:not([hidden])")) {
       closeAllGuestOptionSheets();
       return;
