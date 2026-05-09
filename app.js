@@ -122,6 +122,7 @@ const els = {
   floorPlansContainer: document.getElementById("floorPlansContainer"),
   exportGuestsBtn: document.getElementById("exportGuestsBtn"),
   exportKitchenBtn: document.getElementById("exportKitchenBtn"),
+  exportTablesListBtn: document.getElementById("exportTablesListBtn"),
   exportClientBtn: document.getElementById("exportClientBtn"),
   exportFullBtn: document.getElementById("exportFullBtn"),
   importInput: document.getElementById("importInput"),
@@ -831,6 +832,7 @@ function applyRoleUi() {
 
   if (els.exportGuestsBtn) els.exportGuestsBtn.hidden = appRole !== "struttura";
   if (els.exportKitchenBtn) els.exportKitchenBtn.hidden = appRole !== "struttura";
+  if (els.exportTablesListBtn) els.exportTablesListBtn.hidden = appRole === "staff";
   if (els.exportClientBtn) els.exportClientBtn.hidden = appRole === "staff";
   if (els.exportFullBtn) els.exportFullBtn.hidden = appRole !== "struttura";
   if (els.importFileBtn) els.importFileBtn.hidden = false;
@@ -4120,6 +4122,84 @@ els.exportKitchenBtn.addEventListener("click", () => {
   writePdfLines(pdf, lines, { startY: 20, margin: 10, lineHeight: 5 });
   pdf.save("riepilogo-cucina.pdf");
 });
+
+if (els.exportTablesListBtn) {
+  els.exportTablesListBtn.addEventListener("click", () => {
+    closeAllDropdowns();
+    const orderedTables = [...state.tables].sort((a, b) => Number(a.number) - Number(b.number));
+    if (!orderedTables.length) {
+      alert("Non ci sono tavoli da esportare.");
+      return;
+    }
+    const pdf = createPdfDocument("portrait");
+    if (!pdf) {
+      alert("Libreria PDF non disponibile.");
+      return;
+    }
+    pdf.setFontSize(14);
+    pdf.text(`Riepilogo - ${state.eventName || "Evento"}`, 10, 12);
+    pdf.setFontSize(10);
+    const lines = [];
+
+    lines.push(`Evento: ${state.eventName || "Senza nome"}`);
+    lines.push(`Data esportazione: ${new Date().toLocaleString("it-IT")}`);
+    lines.push("");
+    lines.push("LISTA BREVE TAVOLI");
+    orderedTables.forEach((table) => {
+      const tableName = String(table.customName || "").trim() || "Senza nome";
+      const tableNote = String(table.tableNote || "").trim() || "Nessuna nota";
+      lines.push(`- Tavolo ${table.number} - ${tableName} - Note: ${tableNote}`);
+    });
+    lines.push("");
+    lines.push("LISTA COMPLETA TAVOLI");
+    lines.push("");
+    orderedTables.forEach((table) => {
+      const tableName = String(table.customName || "").trim() || "Senza nome";
+      const tableNote = String(table.tableNote || "").trim() || "Nessuna nota";
+      lines.push(`Tavolo ${table.number} - ${tableName}`);
+      lines.push(`Note tavolo: ${tableNote}`);
+      const guests = getActiveGuests(table);
+      if (!guests.length) {
+        lines.push("- Nessun commensale");
+      } else {
+        guests.forEach((g, idx) => {
+          const fullName = `${String(g.cognome || "").trim()} ${String(g.nome || "").trim()}`.trim() || "Senza nome";
+          const menuLabel = g.menu === "bambino" ? "Bambino" : "Adulto";
+          const noteLabel = String(g.note || "").trim() || "Nessuna";
+          lines.push(`- ${idx + 1}) ${fullName} | Menù: ${menuLabel} | Allergie/Note: ${noteLabel}`);
+        });
+      }
+      lines.push("");
+    });
+
+    let totAdulti = 0;
+    let totBambini = 0;
+    for (const table of orderedTables) {
+      const counts = getTableMenuCounts(table);
+      totAdulti += counts.adulti;
+      totBambini += counts.bambini;
+    }
+    const grouped = getGroupedDietNotesByMenu();
+    lines.push("RIEPILOGO CUCINA");
+    lines.push(`- Menù adulti: ${totAdulti}`);
+    lines.push(`- Menù bambini: ${totBambini}`);
+    lines.push("- Intolleranze/variazioni adulti:");
+    if (!grouped.adulti.length) {
+      lines.push("  - Nessuna specifica inserita");
+    } else {
+      grouped.adulti.forEach((g) => lines.push(`  - ${g.label}: ${g.count}`));
+    }
+    lines.push("- Intolleranze/variazioni bambini:");
+    if (!grouped.bambini.length) {
+      lines.push("  - Nessuna specifica inserita");
+    } else {
+      grouped.bambini.forEach((g) => lines.push(`  - ${g.label}: ${g.count}`));
+    }
+
+    writePdfLines(pdf, lines, { startY: 20, margin: 10, lineHeight: 5 });
+    pdf.save("riepilogo.pdf");
+  });
+}
 
 function applySegnatavoloPreviewDeco(targetDecoEl) {
   if (!targetDecoEl) return;
