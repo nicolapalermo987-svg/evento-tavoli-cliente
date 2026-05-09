@@ -832,7 +832,7 @@ function applyRoleUi() {
 
   if (els.exportGuestsBtn) els.exportGuestsBtn.hidden = appRole !== "struttura";
   if (els.exportKitchenBtn) els.exportKitchenBtn.hidden = appRole !== "struttura";
-  if (els.exportTablesListBtn) els.exportTablesListBtn.hidden = appRole === "staff";
+  if (els.exportTablesListBtn) els.exportTablesListBtn.hidden = false;
   if (els.exportClientBtn) els.exportClientBtn.hidden = appRole === "staff";
   if (els.exportFullBtn) els.exportFullBtn.hidden = appRole !== "struttura";
   if (els.importFileBtn) els.importFileBtn.hidden = false;
