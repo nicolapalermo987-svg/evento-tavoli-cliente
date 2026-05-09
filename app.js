@@ -36,7 +36,7 @@ function resolveRoleFromSimpleLogin() {
   } catch (_) {}
 
   while (true) {
-    const raw = window.prompt("Accesso Evento Tavoli\nInserisci password:", "");
+    const raw = window.prompt("Accesso Evento Tavoli\nInserisci password (suggerita: cliente):", "cliente");
     if (raw === null) {
       alert("Accesso annullato. Riapri la pagina per entrare.");
       return null;
