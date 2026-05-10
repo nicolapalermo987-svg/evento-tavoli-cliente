@@ -1838,9 +1838,8 @@ function measureSegnatavoloListHeaderMm(pdf, theme, innerW, mainTitle, subtitle,
   } else {
     h += 2.2;
   }
-  h += 3.2;
-  h += 1.2;
-  h += 5.5;
+  // Spazio tra intestazione ed elenco nomi (nessuna linea decorativa)
+  h += 10;
   return h;
 }
 
@@ -1872,12 +1871,34 @@ function measureSegnatavoloNamesBlockMm(pdf, theme, innerW, names, bodySizePt) {
   pdf.setFont(theme.bodyFamily, theme.bodyStyle);
   pdf.setFontSize(bodySizePt);
   const lh = Math.max(1.9, bodySizePt * 0.34);
-  let total = 0;
-  for (const n of names) {
-    const lines = pdf.splitTextToSize(String(n), innerW);
-    total += Math.max(1, lines.length) * lh;
+  // Una riga per ospite: il PDF riduce il font se serve, ma l'altezza di riga resta basata su bodySize.
+  return names.length * lh;
+}
+
+/**
+ * Imposta la dimensione font in modo che l'intero nome (cognome + nome) resti su una sola riga.
+ */
+function segnatavoloFitGuestOneLineFontSize(pdf, theme, text, innerW, startSizePt, minSizePt = 2.75) {
+  const t = String(text || "").trim();
+  if (!t) return startSizePt;
+  pdf.setFont(theme.bodyFamily, theme.bodyStyle);
+  let fs = startSizePt;
+  const marginPx = 0.35;
+  const maxW = Math.max(8, innerW - marginPx);
+  while (fs >= minSizePt) {
+    pdf.setFontSize(fs);
+    let fits = false;
+    if (typeof pdf.getTextWidth === "function") {
+      fits = pdf.getTextWidth(t) <= maxW;
+    } else {
+      const parts = pdf.splitTextToSize(t, maxW);
+      fits = parts.length <= 1;
+    }
+    if (fits) return fs;
+    fs -= 0.25;
   }
-  return total;
+  pdf.setFontSize(minSizePt);
+  return minSizePt;
 }
 
 /**
@@ -3611,11 +3632,8 @@ function drawSegnatavoloPage(pdf, table, settings) {
   } else {
     y += 2;
   }
-  y += 3;
-  pdf.setDrawColor(...palette.deco);
-  pdf.setLineWidth(0.35);
-  pdf.line(marginX, y, W - marginX, y);
-  y += 6.5;
+  // Spazio titolo -> elenco (allineato a measureSegnatavoloListHeaderMm: nessuna linea orizzontale)
+  y += 10;
 
   if (!names.length) {
     pdf.setFont(theme.bodyFamily, "italic");
@@ -3628,15 +3646,14 @@ function drawSegnatavoloPage(pdf, table, settings) {
   }
 
   pdf.setFont(theme.bodyFamily, theme.bodyStyle);
-  pdf.setFontSize(bodySize);
   pdf.setTextColor(...palette.body);
   const lineH = Math.max(1.9, bodySize * 0.34);
   for (const n of names) {
-    const lines = pdf.splitTextToSize(n, innerW);
-    for (const line of lines) {
-      pdf.text(line, cx, y, { align: "center" });
-      y += lineH;
-    }
+    const fsLine = segnatavoloFitGuestOneLineFontSize(pdf, theme, n, innerW, bodySize);
+    pdf.setFontSize(fsLine);
+    pdf.text(String(n), cx, y, { align: "center" });
+    y += lineH;
+    pdf.setFontSize(bodySize);
   }
   drawFooter();
   pdf.setTextColor(0, 0, 0);
