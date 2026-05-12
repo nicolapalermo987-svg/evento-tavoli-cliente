@@ -1243,6 +1243,34 @@ function applyFloorPlanFromState() {
   renderFloorPlans();
 }
 
+function getFloorStageScrollableWidth(imgEl) {
+  const naturalW = Number(imgEl?.naturalWidth || 0);
+  if (naturalW > 0) return Math.min(Math.max(naturalW, 820), 1280);
+  return 900;
+}
+
+function syncFloorStageScrollableLayout(stageEl, imgEl) {
+  if (!stageEl || !imgEl) return;
+  const hasImage = !imgEl.hidden && Boolean(imgEl.getAttribute("src"));
+  if (!hasImage) {
+    stageEl.style.width = "";
+    stageEl.style.minWidth = "";
+    stageEl.style.maxWidth = "";
+    return;
+  }
+  const isNarrowViewport = window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
+  if (isNarrowViewport) {
+    const targetWidth = getFloorStageScrollableWidth(imgEl);
+    stageEl.style.width = `${targetWidth}px`;
+    stageEl.style.minWidth = `${targetWidth}px`;
+    stageEl.style.maxWidth = "none";
+  } else {
+    stageEl.style.width = "";
+    stageEl.style.minWidth = "";
+    stageEl.style.maxWidth = "";
+  }
+}
+
 function renderFloorPlans() {
   ensureFloorPlansState();
   if (!els.floorPlansContainer) return;
@@ -1416,7 +1444,17 @@ function renderFloorPlans() {
     wrap.appendChild(stage);
     card.appendChild(wrap);
     els.floorPlansContainer.appendChild(card);
-    layoutMarkerNotes(markers);
+
+    const syncStageLayout = () => {
+      syncFloorStageScrollableLayout(stage, img);
+      layoutMarkerNotes(markers);
+    };
+    if (plan.imageDataUrl) {
+      if (img.complete) syncStageLayout();
+      img.addEventListener("load", syncStageLayout, { once: true });
+    } else {
+      syncStageLayout();
+    }
   });
   applyRoleUi();
 }
@@ -5296,6 +5334,10 @@ els.importInput.addEventListener("change", (e) => {
 });
 
 window.addEventListener("resize", () => {
+  document.querySelectorAll(".floor-stage").forEach((stage) => {
+    const img = stage.querySelector(".floor-img");
+    syncFloorStageScrollableLayout(stage, img);
+  });
   document.querySelectorAll(".floor-markers").forEach((root) => layoutMarkerNotes(root));
   updateCurrentTableContextUi();
   if (els.segnatavoloAreaPanel && !els.segnatavoloAreaPanel.hidden) {

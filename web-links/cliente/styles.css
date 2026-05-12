@@ -1031,7 +1031,8 @@ select:focus {
 .floor-wrap {
   position: relative;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px dashed var(--border);
   min-height: clamp(280px, 52vh, 720px);
   background: #f0ebe4;
@@ -1039,7 +1040,9 @@ select:focus {
 
 .floor-stage {
   position: relative;
-  touch-action: pan-y;
+  width: 100%;
+  min-width: 100%;
+  touch-action: pan-x pan-y;
   min-height: clamp(320px, 52vh, 720px);
 }
 
