@@ -210,6 +210,8 @@ function createFloorPlan(name = "") {
     markerPositions: {},
     /** Tavoli nascosti su questo riquadro (id). Default: nessuno = tutti visibili */
     hiddenTableIds: [],
+    /** Posizioni note personalizzate (solo struttura): { [tableId]: { manual, left, top, translateX, translateY, width } } */
+    markerNoteLayouts: {},
   };
 }
 
@@ -233,6 +235,8 @@ function ensureFloorPlansState() {
       hiddenTableIds: Array.isArray(plan.hiddenTableIds)
         ? plan.hiddenTableIds.filter((id) => typeof id === "string" && id)
         : [],
+      markerNoteLayouts:
+        plan.markerNoteLayouts && typeof plan.markerNoteLayouts === "object" ? { ...plan.markerNoteLayouts } : {},
     }));
 
   if (!state.floorPlans.length) {
@@ -247,6 +251,24 @@ function ensureFloorPlansState() {
   const validTableIds = new Set(state.tables.map((t) => t.id));
   for (const plan of state.floorPlans) {
     plan.hiddenTableIds = (plan.hiddenTableIds || []).filter((id) => validTableIds.has(id));
+    if (!plan.markerNoteLayouts || typeof plan.markerNoteLayouts !== "object") {
+      plan.markerNoteLayouts = {};
+    } else {
+      const cleaned = {};
+      for (const [tid, v] of Object.entries(plan.markerNoteLayouts)) {
+        if (!validTableIds.has(tid)) continue;
+        if (!v || typeof v !== "object" || !v.manual) continue;
+        cleaned[tid] = {
+          manual: true,
+          left: String(v.left || "50%"),
+          top: String(v.top || "calc(100% + 4px)"),
+          translateX: String(v.translateX || "-50%"),
+          translateY: String(v.translateY || "0px"),
+          width: Math.max(80, Math.min(240, Number(v.width) || 180)),
+        };
+      }
+      plan.markerNoteLayouts = cleaned;
+    }
   }
 }
 
@@ -333,6 +355,9 @@ function removeTable(tableId) {
   for (const plan of state.floorPlans) {
     if (plan.markerPositions && plan.markerPositions[tableId]) {
       delete plan.markerPositions[tableId];
+    }
+    if (plan.markerNoteLayouts && plan.markerNoteLayouts[tableId]) {
+      delete plan.markerNoteLayouts[tableId];
     }
     if (Array.isArray(plan.hiddenTableIds)) {
       plan.hiddenTableIds = plan.hiddenTableIds.filter((id) => id !== tableId);
@@ -1362,6 +1387,16 @@ function renderFloorPlans() {
     visWrap.appendChild(visPanel);
     actions.prepend(visWrap);
 
+    if (canEditMapArea()) {
+      const resetNotesBtn = document.createElement("button");
+      resetNotesBtn.type = "button";
+      resetNotesBtn.className = "btn btn-ghost btn-sm";
+      resetNotesBtn.dataset.planResetNoteLayouts = "true";
+      resetNotesBtn.textContent = "Ripristina posizioni note";
+      resetNotesBtn.title = "Elimina gli spostamenti manuali delle note su questa piantina";
+      actions.insertBefore(resetNotesBtn, visWrap.nextSibling);
+    }
+
     if (openMenuForPlanId === plan.id) {
       visPanel.hidden = false;
       visToggleBtn.setAttribute("aria-expanded", "true");
@@ -1424,17 +1459,27 @@ function renderFloorPlans() {
       const counts = getTableMenuCounts(table);
       menus.textContent = `${counts.adulti}A+${counts.bambini}B`;
 
+      const line = document.createElement("span");
+      line.className = "table-marker__note-line";
+      line.setAttribute("aria-hidden", "true");
+
       const notes = document.createElement("div");
       notes.className = "table-marker__notes";
       const markerNotes = getTableMarkerNotesText(table);
       notes.textContent = markerNotes;
       notes.hidden = !markerNotes;
       notes.title = getTableSummaryLine(table);
+      if (canEditMapArea() && markerNotes) {
+        notes.classList.add("table-marker__notes--interactive");
+        notes.title = `${getTableSummaryLine(table)} — Trascina la nota per spostarla (solo struttura).`;
+      }
 
       marker.appendChild(circle);
       marker.appendChild(menus);
+      marker.appendChild(line);
       marker.appendChild(notes);
       attachMarkerDrag(marker, circle, table.id, plan, markers);
+      attachNoteDrag(notes, table.id, plan, markers);
       markers.appendChild(marker);
     }
 
@@ -1493,21 +1538,79 @@ function markerHeaderRect(marker) {
   };
 }
 
+function getFloorPlanByMarkersRoot(markersRoot) {
+  const id = markersRoot?.dataset?.planMarkers;
+  if (!id) return null;
+  return state.floorPlans.find((p) => p.id === id) || null;
+}
+
+function applyManualNoteLayout(note, layout) {
+  if (!note || !layout) return;
+  note.style.setProperty("--note-left", layout.left || "50%");
+  note.style.setProperty("--note-top", layout.top || "calc(100% + 4px)");
+  note.style.setProperty("--note-translate-x", layout.translateX || "-50%");
+  note.style.setProperty("--note-translate-y", layout.translateY || "0px");
+  const w = Number(layout.width);
+  note.style.setProperty("--note-width", `${Number.isFinite(w) ? w : 180}px`);
+}
+
+function updateMarkerNoteLines(markersRoot) {
+  if (!markersRoot) return;
+  for (const marker of markersRoot.querySelectorAll(".table-marker")) {
+    const line = marker.querySelector(".table-marker__note-line");
+    const note = marker.querySelector(".table-marker__notes");
+    const circle = marker.querySelector(".table-marker__circle");
+    if (!line) continue;
+    if (!circle || !note || note.hidden) {
+      line.style.display = "none";
+      continue;
+    }
+    const mr = marker.getBoundingClientRect();
+    const cr = circle.getBoundingClientRect();
+    const nr = note.getBoundingClientRect();
+    if (mr.width < 1 || mr.height < 1) {
+      line.style.display = "none";
+      continue;
+    }
+    const x1 = cr.left + cr.width / 2 - mr.left;
+    const y1 = cr.top + cr.height / 2 - mr.top;
+    const x2 = nr.left + nr.width / 2 - mr.left;
+    const y2 = nr.top + nr.height / 2 - mr.top;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len < 6) {
+      line.style.display = "none";
+      continue;
+    }
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    line.style.display = "block";
+    line.style.left = `${x1}px`;
+    line.style.top = `${y1}px`;
+    line.style.width = `${len}px`;
+    line.style.transform = `rotate(${angle}deg)`;
+  }
+}
+
 function layoutMarkerNotes(markersRoot) {
   if (!markersRoot) return;
   const markers = Array.from(markersRoot.querySelectorAll(".table-marker"));
   if (!markers.length) return;
 
-  // Reset defaults before recomputing.
+  const plan = getFloorPlanByMarkersRoot(markersRoot);
+
+  // Reset defaults before recomputing (salta le note con posizione manuale salvata).
   for (const marker of markers) {
     const note = marker.querySelector(".table-marker__notes");
-    if (note) {
-      note.style.setProperty("--note-left", "50%");
-      note.style.setProperty("--note-top", "calc(100% + 4px)");
-      note.style.setProperty("--note-translate-x", "-50%");
-      note.style.setProperty("--note-translate-y", "0px");
-      note.style.setProperty("--note-width", "180px");
-    }
+    if (!note) continue;
+    const tid = marker.dataset.tableId;
+    const manual = tid && plan?.markerNoteLayouts?.[tid]?.manual;
+    if (manual) continue;
+    note.style.setProperty("--note-left", "50%");
+    note.style.setProperty("--note-top", "calc(100% + 4px)");
+    note.style.setProperty("--note-translate-x", "-50%");
+    note.style.setProperty("--note-translate-y", "0px");
+    note.style.setProperty("--note-width", "180px");
   }
 
   // Sort top-to-bottom, left-to-right for deterministic layout.
@@ -1562,6 +1665,15 @@ function layoutMarkerNotes(markersRoot) {
     const markerId = marker.dataset.tableId;
     const note = marker.querySelector(".table-marker__notes");
     if (!note || note.hidden) continue;
+
+    const saved = markerId && plan?.markerNoteLayouts?.[markerId];
+    if (saved && saved.manual) {
+      applyManualNoteLayout(note, saved);
+      const finalRect = note.getBoundingClientRect();
+      placedNotes.push(finalRect);
+      continue;
+    }
+
     let best = null;
 
     for (const width of widthOptions) {
@@ -1590,6 +1702,8 @@ function layoutMarkerNotes(markersRoot) {
     const finalRect = note.getBoundingClientRect();
     placedNotes.push(finalRect);
   }
+
+  updateMarkerNoteLines(markersRoot);
 }
 
 function attachMarkerDrag(containerEl, handleEl, tableId, plan, markersRoot) {
@@ -1626,6 +1740,7 @@ function attachMarkerDrag(containerEl, handleEl, tableId, plan, markersRoot) {
   handleEl.addEventListener("pointerdown", (e) => {
     if (!canEditMapArea()) return;
     if (e.button !== 0) return;
+    if (e.target.closest(".table-marker__notes--interactive")) return;
     rect = markersRoot.getBoundingClientRect();
     startX = e.clientX;
     startY = e.clientY;
@@ -1636,6 +1751,72 @@ function attachMarkerDrag(containerEl, handleEl, tableId, plan, markersRoot) {
     handleEl.addEventListener("pointerup", onPointerUp);
     handleEl.addEventListener("pointercancel", onPointerUp);
     e.preventDefault();
+  });
+}
+
+function attachNoteDrag(noteEl, tableId, plan, markersRoot) {
+  if (!noteEl || !plan || !markersRoot) return;
+
+  let startX, startY, origAx, origAy;
+
+  function onPointerMove(e) {
+    if (!canEditMapArea()) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const nax = origAx + dx;
+    const nay = origAy + dy;
+    noteEl.style.setProperty("--note-left", `${nax}px`);
+    noteEl.style.setProperty("--note-top", `${nay}px`);
+    noteEl.style.setProperty("--note-translate-x", "-50%");
+    noteEl.style.setProperty("--note-translate-y", "-50%");
+    updateMarkerNoteLines(markersRoot);
+  }
+
+  function onPointerUp(e) {
+    if (!canEditMapArea()) return;
+    noteEl.releasePointerCapture(e.pointerId);
+    noteEl.removeEventListener("pointermove", onPointerMove);
+    noteEl.removeEventListener("pointerup", onPointerUp);
+    noteEl.removeEventListener("pointercancel", onPointerUp);
+    const marker = noteEl.closest(".table-marker");
+    if (marker) {
+      const mr = marker.getBoundingClientRect();
+      const nr = noteEl.getBoundingClientRect();
+      const ax = nr.left + nr.width / 2 - mr.left;
+      const ay = nr.top + nr.height / 2 - mr.top;
+      const tw = parseFloat(getComputedStyle(noteEl).getPropertyValue("--note-width")) || 180;
+      if (!plan.markerNoteLayouts) plan.markerNoteLayouts = {};
+      plan.markerNoteLayouts[tableId] = {
+        manual: true,
+        left: `${ax}px`,
+        top: `${ay}px`,
+        translateX: "-50%",
+        translateY: "-50%",
+        width: Math.max(80, Math.min(240, tw)),
+      };
+      saveState();
+    }
+    updateMarkerNoteLines(markersRoot);
+  }
+
+  noteEl.addEventListener("pointerdown", (e) => {
+    if (!canEditMapArea()) return;
+    if (e.button !== 0) return;
+    if (noteEl.hidden) return;
+    const marker = noteEl.closest(".table-marker");
+    if (!marker) return;
+    const mr = marker.getBoundingClientRect();
+    const nr = noteEl.getBoundingClientRect();
+    origAx = nr.left + nr.width / 2 - mr.left;
+    origAy = nr.top + nr.height / 2 - mr.top;
+    startX = e.clientX;
+    startY = e.clientY;
+    noteEl.setPointerCapture(e.pointerId);
+    noteEl.addEventListener("pointermove", onPointerMove);
+    noteEl.addEventListener("pointerup", onPointerUp);
+    noteEl.addEventListener("pointercancel", onPointerUp);
+    e.preventDefault();
+    e.stopPropagation();
   });
 }
 
@@ -3989,6 +4170,14 @@ if (els.floorPlansContainer) {
       saveState();
       preservePlanVisibilityMenuPlanId = planId;
       renderFloorPlans();
+      return;
+    }
+
+    if (e.target.closest("[data-plan-reset-note-layouts]")) {
+      plan.markerNoteLayouts = {};
+      saveState();
+      const markers = card.querySelector(".floor-markers");
+      if (markers) layoutMarkerNotes(markers);
       return;
     }
 

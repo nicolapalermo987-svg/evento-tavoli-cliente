@@ -1169,6 +1169,32 @@ select:focus {
   pointer-events: none;
 }
 
+.table-marker__notes--interactive {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.table-marker__notes--interactive:active {
+  cursor: grabbing;
+  z-index: 25;
+}
+
+.table-marker__note-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 2px;
+  background: rgba(176, 132, 72, 0.55);
+  transform-origin: 0 50%;
+  pointer-events: none;
+  z-index: 12;
+  display: none;
+  border-radius: 1px;
+}
+
 .footer {
   margin-top: 2rem;
   text-align: center;
