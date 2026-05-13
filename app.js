@@ -831,6 +831,12 @@ function setMainAreaView(view) {
     els.showAcceptanceAreaBtn.classList.toggle("is-active", isActive);
     els.showAcceptanceAreaBtn.setAttribute("aria-pressed", isActive ? "true" : "false");
   }
+
+  if (targetView === "map") {
+    requestAnimationFrame(() => {
+      document.querySelectorAll(".floor-markers").forEach((root) => scheduleMarkerNoteLinesRefresh(root));
+    });
+  }
 }
 
 function getCurrentMainAreaView() {
@@ -1559,6 +1565,37 @@ function applyManualNoteLayout(note, layout) {
   note.style.setProperty("--note-width", `${Number.isFinite(w) ? w : 180}px`);
 }
 
+/** Primo punto in cui il raggio (sx,sy)+t*(ux,uy), t>tMin, incontra il bordo del rettangolo [left,top]-[right,bottom]. */
+function rayFirstPositiveAabbHit(sx, sy, ux, uy, left, top, right, bottom, tMin) {
+  const hits = [];
+  if (Math.abs(ux) > 1e-9) {
+    for (const xe of [left, right]) {
+      const t = (xe - sx) / ux;
+      if (t <= tMin) continue;
+      const yy = sy + t * uy;
+      if (yy >= top - 0.3 && yy <= bottom + 0.3) hits.push(t);
+    }
+  }
+  if (Math.abs(uy) > 1e-9) {
+    for (const ye of [top, bottom]) {
+      const t = (ye - sy) / uy;
+      if (t <= tMin) continue;
+      const xx = sx + t * ux;
+      if (xx >= left - 0.3 && xx <= right + 0.3) hits.push(t);
+    }
+  }
+  if (!hits.length) return null;
+  return Math.min(...hits);
+}
+
+function pointInAabb(px, py, left, top, right, bottom) {
+  return px >= left && px <= right && py >= top && py <= bottom;
+}
+
+/**
+ * Aggiorna i segmenti tra cerchio tavolo e riquadro note (coordinate relative al marker).
+ * Non nasconde più il filo per note vicine al cerchio; dopo import/layout ritenta con `scheduleMarkerNoteLinesRefresh`.
+ */
 function updateMarkerNoteLines(markersRoot) {
   if (!markersRoot) return;
   for (const marker of markersRoot.querySelectorAll(".table-marker")) {
@@ -1573,28 +1610,82 @@ function updateMarkerNoteLines(markersRoot) {
     const mr = marker.getBoundingClientRect();
     const cr = circle.getBoundingClientRect();
     const nr = note.getBoundingClientRect();
-    if (mr.width < 1 || mr.height < 1) {
+    if (mr.width < 0.5 || mr.height < 0.5 || cr.width < 1 || nr.width < 1) {
       line.style.display = "none";
       continue;
     }
-    const x1 = cr.left + cr.width / 2 - mr.left;
-    const y1 = cr.top + cr.height / 2 - mr.top;
-    const x2 = nr.left + nr.width / 2 - mr.left;
-    const y2 = nr.top + nr.height / 2 - mr.top;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const len = Math.hypot(dx, dy);
-    if (len < 6) {
-      line.style.display = "none";
-      continue;
+
+    const ccx = cr.left + cr.width / 2 - mr.left;
+    const ccy = cr.top + cr.height / 2 - mr.top;
+    const ncx = nr.left + nr.width / 2 - mr.left;
+    const ncy = nr.top + nr.height / 2 - mr.top;
+
+    let vx = ncx - ccx;
+    let vy = ncy - ccy;
+    let dist = Math.hypot(vx, vy);
+    if (dist < 1e-4) {
+      vx = 0;
+      vy = 1;
+      dist = 1;
     }
+    const ux = vx / dist;
+    const uy = vy / dist;
+
+    const nl = nr.left - mr.left;
+    const nt = nr.top - mr.top;
+    const nrRight = nl + nr.width;
+    const nrBottom = nt + nr.height;
+
+    let rEdge = Math.min(cr.width, cr.height) / 2 - 0.5;
+    if (rEdge < 2) rEdge = 2;
+    let sx = ccx + ux * rEdge;
+    let sy = ccy + uy * rEdge;
+    let guard = 0;
+    while (pointInAabb(sx, sy, nl, nt, nrRight, nrBottom) && guard < 24) {
+      rEdge += 3;
+      sx = ccx + ux * rEdge;
+      sy = ccy + uy * rEdge;
+      guard += 1;
+    }
+
+    const tHit = rayFirstPositiveAabbHit(sx, sy, ux, uy, nl, nt, nrRight, nrBottom, 0.05);
+    let ex = ncx;
+    let ey = ncy;
+    if (tHit != null && Number.isFinite(tHit)) {
+      ex = sx + ux * tHit;
+      ey = sy + uy * tHit;
+    }
+
+    let dx = ex - sx;
+    let dy = ey - sy;
+    let len = Math.hypot(dx, dy);
+    if (len < 4) {
+      const minStub = 14;
+      ex = sx + ux * minStub;
+      ey = sy + uy * minStub;
+      dx = ex - sx;
+      dy = ey - sy;
+      len = Math.hypot(dx, dy);
+    }
+
     const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
     line.style.display = "block";
-    line.style.left = `${x1}px`;
-    line.style.top = `${y1}px`;
-    line.style.width = `${len}px`;
+    line.style.left = `${sx}px`;
+    line.style.top = `${sy}px`;
+    line.style.width = `${Math.max(len, 4)}px`;
     line.style.transform = `rotate(${angle}deg)`;
   }
+}
+
+/** Dopo layout o immagine, i rect possono essere ancora a zero: ripeti il disegno fili nei frame successivi. */
+function scheduleMarkerNoteLinesRefresh(markersRoot) {
+  if (!markersRoot) return;
+  const tick = () => updateMarkerNoteLines(markersRoot);
+  tick();
+  requestAnimationFrame(tick);
+  requestAnimationFrame(() => requestAnimationFrame(tick));
+  setTimeout(tick, 50);
+  setTimeout(tick, 220);
 }
 
 function layoutMarkerNotes(markersRoot) {
@@ -1708,7 +1799,7 @@ function layoutMarkerNotes(markersRoot) {
     placedNotes.push(finalRect);
   }
 
-  updateMarkerNoteLines(markersRoot);
+  scheduleMarkerNoteLinesRefresh(markersRoot);
 }
 
 function attachMarkerDrag(containerEl, handleEl, tableId, plan, markersRoot) {
@@ -4211,6 +4302,18 @@ if (els.floorPlansContainer) {
       saveState();
     }
   });
+
+  els.floorPlansContainer.addEventListener(
+    "scroll",
+    (e) => {
+      const wrap = e.target.closest(".floor-wrap");
+      if (!wrap) return;
+      const stage = wrap.querySelector(".floor-stage");
+      const markers = stage && stage.querySelector(".floor-markers");
+      if (markers) updateMarkerNoteLines(markers);
+    },
+    true
+  );
 
   document.addEventListener("mousedown", (e) => {
     if (e.target.closest(".plan-visibility")) return;
