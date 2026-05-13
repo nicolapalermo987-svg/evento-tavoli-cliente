@@ -75,6 +75,11 @@ function canEditMapArea() {
   return appRole === "struttura";
 }
 
+/** Esportazione PDF singolo riquadro piantina: struttura e staff (sola lettura mappa). */
+function canExportFloorPlanPdf() {
+  return appRole === "struttura" || appRole === "staff";
+}
+
 function canEditStudioAreas() {
   return appRole === "struttura";
 }
@@ -1320,7 +1325,7 @@ function renderFloorPlans() {
       </label>
       <button type="button" class="btn btn-ghost btn-sm" data-plan-clear-btn="true">Rimuovi immagine</button>
       <button type="button" class="btn btn-danger btn-sm" data-plan-remove-btn="true">Elimina riquadro</button>
-      <button type="button" class="btn btn-secondary btn-sm" data-plan-export-pdf="true">Esporta piantina PDF</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-plan-export-pdf="true" data-role-always-enabled="true">Esporta piantina PDF</button>
     `;
 
     const hiddenSet = new Set(plan.hiddenTableIds || []);
@@ -4145,6 +4150,15 @@ if (els.floorPlansContainer) {
   });
 
   els.floorPlansContainer.addEventListener("click", (e) => {
+    const exportPdfHit = e.target.closest("[data-plan-export-pdf='true']");
+    if (exportPdfHit) {
+      if (!canExportFloorPlanPdf()) return;
+      const cardPdf = exportPdfHit.closest(".floor-plan-card");
+      const planIdPdf = cardPdf ? cardPdf.dataset.planId || "" : "";
+      if (planIdPdf) exportPlanPdf(planIdPdf);
+      return;
+    }
+
     if (!canEditMapArea()) return;
     const card = e.target.closest(".floor-plan-card");
     if (!card) return;
@@ -4178,11 +4192,6 @@ if (els.floorPlansContainer) {
       saveState();
       const markers = card.querySelector(".floor-markers");
       if (markers) layoutMarkerNotes(markers);
-      return;
-    }
-
-    if (e.target.closest("[data-plan-export-pdf='true']")) {
-      exportPlanPdf(planId);
       return;
     }
 
