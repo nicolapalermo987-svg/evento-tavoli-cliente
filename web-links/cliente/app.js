@@ -160,6 +160,9 @@ const els = {
   segnatavoloColorDeco: document.getElementById("segnatavoloColorDeco"),
   segnatavoloPaperFormat: document.getElementById("segnatavoloPaperFormat"),
   segnatavoloOrientation: document.getElementById("segnatavoloOrientation"),
+  segnatavoloExportSheet: document.getElementById("segnatavoloExportSheet"),
+  segnatavoloExportCutSpacing: document.getElementById("segnatavoloExportCutSpacing"),
+  segnatavoloExportCutSpacingWrap: document.getElementById("segnatavoloExportCutSpacingWrap"),
   segnatavoloHeaderMode: document.getElementById("segnatavoloHeaderMode"),
   segnatavoloShowGuests: document.getElementById("segnatavoloShowGuests"),
   menuBookletLogoInput: document.getElementById("menuBookletLogoInput"),
@@ -2004,6 +2007,10 @@ const DEFAULT_SEGNATAVOLO_SETTINGS = {
   customDecoHex: "#c4a35a",
   paperFormat: "a5",
   paperOrientation: "portrait",
+  /** same = una pagina per tavolo al formato segnatavolo; a4 = più tavoli su foglio A4 con bordi sovrapposti (taglio). */
+  exportSheetMode: "same",
+  /** Solo imposizione A4: quanto si sovrappongono due segnatavoli sul lato di taglio (mm). */
+  exportCutSpacing: "tight",
   headerMode: "both",
   showGuests: true,
 };
@@ -2089,6 +2096,66 @@ function getSegnatavoloPdfFormatAndKey() {
     ? segnatavoloSettings.paperFormat
     : "a5";
   return { key, format: SEGNATAVOLO_PAPER_FORMATS[key] };
+}
+
+/** Millimetri di sovrapposizione sul lato condiviso tra due segnatavoli (linea di taglio). */
+function getSegnatavoloExportOverlapMm() {
+  return (segnatavoloSettings.exportCutSpacing || "tight") === "comfortable" ? 0.95 : 0.35;
+}
+
+function segnatavoloImpositionUsedMm(n, cellLen, delta) {
+  if (n < 1) return 0;
+  return n * cellLen - (n - 1) * delta;
+}
+
+/** Massimo numero di righe (ny) dato nx colonne, foglio Sw×Sh e cella cw×ch. */
+function segnatavoloMaxNyForNx(Sw, Sh, cw, ch, delta, nx) {
+  const usedW = segnatavoloImpositionUsedMm(nx, cw, delta);
+  if (usedW > Sw + 1e-4) return 0;
+  if (ch > Sh + 1e-4) return 0;
+  let ny = 1;
+  for (;;) {
+    const usedH = segnatavoloImpositionUsedMm(ny + 1, ch, delta);
+    if (usedH > Sh + 1e-4) break;
+    ny++;
+  }
+  return ny;
+}
+
+/**
+ * Miglior griglia nx×ny su foglio A4 (prova verticale 210×297 e orizzontale 297×210).
+ * Massimizza nx*ny; a parità minimizza lo “scrap” (mm di foglio non coperti).
+ */
+function segnatavoloComputeBestA4Grid(cw, ch, delta) {
+  const variants = [
+    { Sw: 210, Sh: 297, label: "portrait" },
+    { Sw: 297, Sh: 210, label: "landscape" },
+  ];
+  let best = {
+    count: 0,
+    nx: 1,
+    ny: 1,
+    Sw: 210,
+    Sh: 297,
+    usedW: cw,
+    usedH: ch,
+    scrap: Infinity,
+    label: "portrait",
+  };
+  for (const { Sw, Sh, label } of variants) {
+    for (let nx = 1; nx < 50; nx++) {
+      const ny = segnatavoloMaxNyForNx(Sw, Sh, cw, ch, delta, nx);
+      if (ny < 1) break;
+      const count = nx * ny;
+      const usedW = segnatavoloImpositionUsedMm(nx, cw, delta);
+      const usedH = segnatavoloImpositionUsedMm(ny, ch, delta);
+      const scrap = Sw - usedW + Sh - usedH;
+      if (count > best.count || (count === best.count && scrap < best.scrap - 1e-6)) {
+        best = { count, nx, ny, Sw, Sh, usedW, usedH, scrap, label };
+      }
+    }
+  }
+  return best;
 }
 
 /** Come in CSS/stampa: 72 pt = 1 pollice = 96 px. Allinea l’anteprima ai punti usati da jsPDF nel PDF. */
@@ -2315,6 +2382,15 @@ function getSegnatavoloLayoutForCurrentState(tablesForLayout) {
   );
 }
 
+function segnatavoloSyncExportSheetUi() {
+  const wrap = els.segnatavoloExportCutSpacingWrap;
+  const cutSel = els.segnatavoloExportCutSpacing;
+  const sheetSel = els.segnatavoloExportSheet;
+  const same = !sheetSel || String(sheetSel.value || "same") === "same";
+  if (wrap) wrap.hidden = same;
+  if (cutSel) cutSel.disabled = same;
+}
+
 function loadSegnatavoloSettings() {
   try {
     const raw = localStorage.getItem(SEGNATAVOLO_STYLE_KEY);
@@ -2337,6 +2413,12 @@ function loadSegnatavoloSettings() {
       if (o.paperOrientation === "portrait" || o.paperOrientation === "landscape") {
         segnatavoloSettings.paperOrientation = o.paperOrientation;
       }
+      if (o.exportSheetMode === "same" || o.exportSheetMode === "a4") {
+        segnatavoloSettings.exportSheetMode = o.exportSheetMode;
+      }
+      if (o.exportCutSpacing === "tight" || o.exportCutSpacing === "comfortable") {
+        segnatavoloSettings.exportCutSpacing = o.exportCutSpacing;
+      }
       if (o.headerMode === "both" || o.headerMode === "name" || o.headerMode === "number") {
         segnatavoloSettings.headerMode = o.headerMode;
       }
@@ -2358,8 +2440,11 @@ function loadSegnatavoloSettings() {
   }
   if (els.segnatavoloPaperFormat) els.segnatavoloPaperFormat.value = segnatavoloSettings.paperFormat;
   if (els.segnatavoloOrientation) els.segnatavoloOrientation.value = segnatavoloSettings.paperOrientation;
+  if (els.segnatavoloExportSheet) els.segnatavoloExportSheet.value = segnatavoloSettings.exportSheetMode || "same";
+  if (els.segnatavoloExportCutSpacing) els.segnatavoloExportCutSpacing.value = segnatavoloSettings.exportCutSpacing || "tight";
   if (els.segnatavoloHeaderMode) els.segnatavoloHeaderMode.value = segnatavoloSettings.headerMode;
   if (els.segnatavoloShowGuests) els.segnatavoloShowGuests.checked = Boolean(segnatavoloSettings.showGuests);
+  segnatavoloSyncExportSheetUi();
 }
 
 function saveSegnatavoloSettings() {
@@ -2375,6 +2460,14 @@ function saveSegnatavoloSettings() {
   if (els.segnatavoloOrientation) {
     segnatavoloSettings.paperOrientation =
       els.segnatavoloOrientation.value === "landscape" ? "landscape" : "portrait";
+  }
+  if (els.segnatavoloExportSheet) {
+    const sm = String(els.segnatavoloExportSheet.value || "same");
+    segnatavoloSettings.exportSheetMode = sm === "a4" ? "a4" : "same";
+  }
+  if (els.segnatavoloExportCutSpacing) {
+    const cs = String(els.segnatavoloExportCutSpacing.value || "tight");
+    segnatavoloSettings.exportCutSpacing = cs === "comfortable" ? "comfortable" : "tight";
   }
   if (els.segnatavoloHeaderMode) {
     const mode = els.segnatavoloHeaderMode.value;
@@ -3974,6 +4067,11 @@ function drawSegnatavoloPage(pdf, table, settings) {
   pdf.setTextColor(0, 0, 0);
   } finally {
     if (targetRect) {
+      if (settings._drawCutFrame) {
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.12);
+        pdf.rect(0, 0, W, H, "S");
+      }
       pdf.internal.write("Q");
     }
   }
@@ -5095,6 +5193,16 @@ function buildSegnatavoloDesignerUi() {
       });
     });
 
+  [["segnatavoloExportSheet", "change"], ["segnatavoloExportCutSpacing", "change"]].forEach(([id, eventName]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener(eventName, () => {
+      saveSegnatavoloSettings();
+      segnatavoloSyncExportSheetUi();
+      updateSegnatavoloPreview();
+    });
+  });
+
   if (els.segnatavoloShowGuests) {
     els.segnatavoloShowGuests.addEventListener("change", () => {
       saveSegnatavoloSettings();
@@ -5108,26 +5216,73 @@ function runSegnatavoliPdfExport() {
     alert("Non ci sono tavoli da esportare.");
     return;
   }
-  const orientation = segnatavoloSettings.paperOrientation === "landscape" ? "landscape" : "portrait";
-  const { key: formatKey, format } = getSegnatavoloPdfFormatAndKey();
-  const pdf = window.jspdf && window.jspdf.jsPDF
-    ? new window.jspdf.jsPDF({ orientation, unit: "mm", format })
-    : null;
-  if (!pdf) {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
     alert("Libreria PDF non disponibile.");
     return;
   }
+
+  const orientation = segnatavoloSettings.paperOrientation === "landscape" ? "landscape" : "portrait";
+  const { key: formatKey } = getSegnatavoloPdfFormatAndKey();
   const palette = getSegnatavoloPaletteResolved();
   const theme = getSegnatavoloTheme();
-  const W = pdf.internal.pageSize.getWidth();
-  const H = pdf.internal.pageSize.getHeight();
   const ordered = [...state.tables].sort((a, b) => Number(a.number) - Number(b.number));
   const layoutSettings = {
     headerMode: segnatavoloSettings.headerMode,
     showGuests: Boolean(segnatavoloSettings.showGuests),
   };
-  const batchLayout = computeSegnatavoloBatchLayout(pdf, ordered, layoutSettings, theme, W, H);
-  const opts = {
+
+  const exportMode = segnatavoloSettings.exportSheetMode === "a4" ? "a4" : "same";
+
+  if (exportMode === "same") {
+    const pdf = new window.jspdf.jsPDF({ orientation, unit: "mm", format });
+    const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
+    const batchLayout = computeSegnatavoloBatchLayout(pdf, ordered, layoutSettings, theme, W, H);
+    const opts = {
+      themeId: segnatavoloSettings.themeId,
+      paletteId: segnatavoloSettings.paletteId,
+      graphicIndex: segnatavoloSettings.graphicIndex,
+      festiveMarginId: segnatavoloSettings.festiveMarginId || null,
+      headerMode: segnatavoloSettings.headerMode,
+      showGuests: layoutSettings.showGuests,
+      _palette: palette,
+      _layout: batchLayout,
+    };
+    ordered.forEach((table, idx) => {
+      if (idx > 0) pdf.addPage();
+      drawSegnatavoloPage(pdf, table, opts);
+    });
+    pdf.save(`segnatavoli-${formatKey}-${orientation === "landscape" ? "orizzontale" : "verticale"}.pdf`);
+    return;
+  }
+
+  const [cw, ch] = getSegnatavoloPaperSizeMm();
+  const delta = getSegnatavoloExportOverlapMm();
+  if (delta >= Math.min(cw, ch) - 1e-3) {
+    alert("Sovrapposizione taglio troppo grande rispetto al formato segnatavolo.");
+    return;
+  }
+
+  const grid = segnatavoloComputeBestA4Grid(cw, ch, delta);
+  if (grid.count < 1) {
+    alert("Impossibile impaginare: il formato scelto non risulta compatibile con A4.");
+    return;
+  }
+
+  const pdfImpose = new window.jspdf.jsPDF({
+    unit: "mm",
+    format: "a4",
+    orientation: grid.label === "landscape" ? "landscape" : "portrait",
+  });
+  const pageW = pdfImpose.internal.pageSize.getWidth();
+  const pageH = pdfImpose.internal.pageSize.getHeight();
+  if (Math.abs(pageW - grid.Sw) > 2 || Math.abs(pageH - grid.Sh) > 2) {
+    alert("Errore interno: dimensioni foglio A4 non attese.");
+    return;
+  }
+
+  const batchLayoutImpose = computeSegnatavoloBatchLayout(pdfImpose, ordered, layoutSettings, theme, cw, ch);
+  const optsImpose = {
     themeId: segnatavoloSettings.themeId,
     paletteId: segnatavoloSettings.paletteId,
     graphicIndex: segnatavoloSettings.graphicIndex,
@@ -5135,13 +5290,30 @@ function runSegnatavoliPdfExport() {
     headerMode: segnatavoloSettings.headerMode,
     showGuests: layoutSettings.showGuests,
     _palette: palette,
-    _layout: batchLayout,
+    _layout: batchLayoutImpose,
   };
-  ordered.forEach((table, idx) => {
-    if (idx > 0) pdf.addPage();
-    drawSegnatavoloPage(pdf, table, opts);
-  });
-  pdf.save(`segnatavoli-${formatKey}-${orientation === "landscape" ? "orizzontale" : "verticale"}.pdf`);
+
+  let t = 0;
+  while (t < ordered.length) {
+    if (t > 0) pdfImpose.addPage();
+    for (let j = 0; j < grid.ny && t < ordered.length; j++) {
+      for (let i = 0; i < grid.nx && t < ordered.length; i++) {
+        const x = i * (cw - delta);
+        const y = j * (ch - delta);
+        drawSegnatavoloPage(pdfImpose, ordered[t], {
+          ...optsImpose,
+          _targetRect: { x, y, w: cw, h: ch },
+          _drawCutFrame: true,
+        });
+        t++;
+      }
+    }
+  }
+
+  const cutLabel = (segnatavoloSettings.exportCutSpacing || "tight") === "comfortable" ? "taglio-comodo" : "taglio-stretto";
+  pdfImpose.save(
+    `segnatavoli-${formatKey}-${orientation === "landscape" ? "orizzontale" : "verticale"}-a4-${cutLabel}.pdf`
+  );
 }
 
 function drawMenuBookletPanelFrame(pdf, x, y, w, h, palette) {
