@@ -3946,12 +3946,66 @@ function getSegnatavoloPreviewTable() {
 }
 
 /**
- * jsPDF con unità "mm": i comandi grezzi (`cm`, ecc.) nel content stream usano lo spazio utente in pt.
- * Moltiplica mm → fattore interno (di solito 72/25.4).
+ * Proxy jsPDF: sposta tutte le coordinate di disegno (mm) di (ox, oy).
+ * Necessario per l'imposizione su A4: `q … cm` non compone bene con transformY/getVerticalCoordinate interni.
  */
-function pdfRawTranslateFromMm(pdf, xMm, yMm) {
-  const k = pdf.internal.scaleFactor != null ? pdf.internal.scaleFactor : 72 / 25.4;
-  return [Number(xMm) * k, Number(yMm) * k];
+function segnatavoloOffsetPdf(pdf, oxMm, oyMm) {
+  const ox = Number(oxMm) || 0;
+  const oy = Number(oyMm) || 0;
+  if (ox === 0 && oy === 0) return pdf;
+  const base = pdf;
+  const ax = (x) => (Number(x) || 0) + ox;
+  const ay = (y) => (Number(y) || 0) + oy;
+
+  return new Proxy(base, {
+    get(target, prop, receiver) {
+      const orig = Reflect.get(target, prop, receiver);
+      if (typeof orig !== "function") return orig;
+
+      if (prop === "text") {
+        return function (text, x, y, ...rest) {
+          return orig.call(target, text, ax(x), ay(y), ...rest);
+        };
+      }
+      if (prop === "rect") {
+        return function (x, y, w, h, style) {
+          return orig.call(target, ax(x), ay(y), w, h, style);
+        };
+      }
+      if (prop === "line") {
+        return function (x1, y1, x2, y2) {
+          return orig.call(target, ax(x1), ay(y1), ax(x2), ay(y2));
+        };
+      }
+      if (prop === "circle") {
+        return function (x, y, r, style) {
+          return orig.call(target, ax(x), ay(y), r, style);
+        };
+      }
+      if (prop === "ellipse") {
+        return function (x, y, rx, ry, style, rot) {
+          if (arguments.length >= 6) return orig.call(target, ax(x), ay(y), rx, ry, style, rot);
+          return orig.call(target, ax(x), ay(y), rx, ry, style);
+        };
+      }
+      if (prop === "triangle") {
+        return function (x1, y1, x2, y2, x3, y3, style) {
+          return orig.call(target, ax(x1), ay(y1), ax(x2), ay(y2), ax(x3), ay(y3), style);
+        };
+      }
+      if (prop === "lines") {
+        return function (points, x, y, scale, style, closed) {
+          return orig.call(target, points, ax(x), ay(y), scale, style, closed);
+        };
+      }
+      if (prop === "roundRect" || prop === "roundedRect") {
+        return function (x, y, w, h, rx, ry, style) {
+          return orig.call(target, ax(x), ay(y), w, h, rx, ry, style);
+        };
+      }
+      return orig.bind(target);
+    },
+  });
 }
 
 function drawSegnatavoloPage(pdf, table, settings) {
@@ -3986,103 +4040,97 @@ function drawSegnatavoloPage(pdf, table, settings) {
 
   const titleLineH = (sz) => segnatavoloTitleLineHeightMm(sz);
 
+  const drawPdf = targetRect ? segnatavoloOffsetPdf(pdf, offsetX, offsetY) : pdf;
+
   function drawFooter() {
-    pdf.setFont(theme.footFamily, theme.footStyle);
-    pdf.setFontSize(theme.footSize);
-    pdf.setTextColor(...palette.foot);
-    pdf.text(foot, cx, footY, { align: "center" });
-    pdf.setTextColor(0, 0, 0);
+    drawPdf.setFont(theme.footFamily, theme.footStyle);
+    drawPdf.setFontSize(theme.footSize);
+    drawPdf.setTextColor(...palette.foot);
+    drawPdf.text(foot, cx, footY, { align: "center" });
+    drawPdf.setTextColor(0, 0, 0);
   }
 
-  if (targetRect) {
-    const [tx, ty] = pdfRawTranslateFromMm(pdf, offsetX, offsetY);
-    pdf.internal.write(`q 1 0 0 1 ${tx} ${ty} cm`);
-  }
   try {
-  const fid = settings.festiveMarginId || null;
-  if (fid) drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, fid);
-  else drawSegnatavoloGraphic(pdf, W, H, palette.deco, gi);
+    const fid = settings.festiveMarginId || null;
+    if (fid) drawSegnatavoloFestiveMarginArt(drawPdf, W, H, palette, fid);
+    else drawSegnatavoloGraphic(drawPdf, W, H, palette.deco, gi);
 
-  if (heroMode) {
-    const heroH = measureSegnatavoloHeroHeaderMm(pdf, theme, innerW, mainTitle, subtitle, titleSize, subSize);
-    let y = innerTop + Math.max(0, (layout.contentH - heroH) / 2);
-    pdf.setFont(theme.titleFamily, theme.titleStyle);
-    pdf.setFontSize(titleSize);
-    pdf.setTextColor(...palette.title);
-    const titleLines = pdf.splitTextToSize(mainTitle, innerW);
+    if (heroMode) {
+      const heroH = measureSegnatavoloHeroHeaderMm(pdf, theme, innerW, mainTitle, subtitle, titleSize, subSize);
+      let y = innerTop + Math.max(0, (layout.contentH - heroH) / 2);
+      drawPdf.setFont(theme.titleFamily, theme.titleStyle);
+      drawPdf.setFontSize(titleSize);
+      drawPdf.setTextColor(...palette.title);
+      const titleLines = drawPdf.splitTextToSize(mainTitle, innerW);
+      for (const line of titleLines) {
+        drawPdf.text(line, cx, y, { align: "center" });
+        y += titleLineH(titleSize);
+      }
+      if (subtitle) {
+        drawPdf.setFont(theme.subFamily, theme.subStyle);
+        drawPdf.setFontSize(subSize);
+        drawPdf.setTextColor(...palette.subtitle);
+        const subLines = drawPdf.splitTextToSize(subtitle, innerW);
+        for (const line of subLines) {
+          drawPdf.text(line, cx, y + 0.4, { align: "center" });
+          y += titleLineH(subSize);
+        }
+      }
+      drawFooter();
+      drawPdf.setTextColor(0, 0, 0);
+      return;
+    }
+
+    let y = innerTop + 3.5;
+    drawPdf.setFont(theme.titleFamily, theme.titleStyle);
+    drawPdf.setFontSize(titleSize);
+    drawPdf.setTextColor(...palette.title);
+    const titleLines = drawPdf.splitTextToSize(mainTitle, innerW);
     for (const line of titleLines) {
-      pdf.text(line, cx, y, { align: "center" });
+      drawPdf.text(line, cx, y, { align: "center" });
       y += titleLineH(titleSize);
     }
     if (subtitle) {
-      pdf.setFont(theme.subFamily, theme.subStyle);
-      pdf.setFontSize(subSize);
-      pdf.setTextColor(...palette.subtitle);
-      const subLines = pdf.splitTextToSize(subtitle, innerW);
+      drawPdf.setFont(theme.subFamily, theme.subStyle);
+      drawPdf.setFontSize(subSize);
+      drawPdf.setTextColor(...palette.subtitle);
+      const subLines = drawPdf.splitTextToSize(subtitle, innerW);
       for (const line of subLines) {
-        pdf.text(line, cx, y + 0.4, { align: "center" });
+        drawPdf.text(line, cx, y + 0.5, { align: "center" });
         y += titleLineH(subSize);
       }
+    } else {
+      y += 2;
+    }
+    y += 10;
+
+    if (!names.length) {
+      drawPdf.setFont(theme.bodyFamily, "italic");
+      drawPdf.setFontSize(Math.max(5.5, bodySize * 0.88));
+      drawPdf.setTextColor(...palette.subtitle);
+      drawPdf.text("Nessun ospite in elenco.", cx, y + 4, { align: "center" });
+      drawFooter();
+      drawPdf.setTextColor(0, 0, 0);
+      return;
+    }
+
+    drawPdf.setFont(theme.bodyFamily, theme.bodyStyle);
+    drawPdf.setTextColor(...palette.body);
+    const lineH = Math.max(1.9, bodySize * 0.34);
+    for (const n of names) {
+      const fsLine = segnatavoloFitGuestOneLineFontSize(pdf, theme, n, innerW, bodySize);
+      drawPdf.setFontSize(fsLine);
+      drawPdf.text(String(n), cx, y, { align: "center" });
+      y += lineH;
+      drawPdf.setFontSize(bodySize);
     }
     drawFooter();
-    pdf.setTextColor(0, 0, 0);
-    return;
-  }
-
-  let y = innerTop + 3.5;
-  pdf.setFont(theme.titleFamily, theme.titleStyle);
-  pdf.setFontSize(titleSize);
-  pdf.setTextColor(...palette.title);
-  const titleLines = pdf.splitTextToSize(mainTitle, innerW);
-  for (const line of titleLines) {
-    pdf.text(line, cx, y, { align: "center" });
-    y += titleLineH(titleSize);
-  }
-  if (subtitle) {
-    pdf.setFont(theme.subFamily, theme.subStyle);
-    pdf.setFontSize(subSize);
-    pdf.setTextColor(...palette.subtitle);
-    const subLines = pdf.splitTextToSize(subtitle, innerW);
-    for (const line of subLines) {
-      pdf.text(line, cx, y + 0.5, { align: "center" });
-      y += titleLineH(subSize);
-    }
-  } else {
-    y += 2;
-  }
-  // Spazio titolo -> elenco (allineato a measureSegnatavoloListHeaderMm: nessuna linea orizzontale)
-  y += 10;
-
-  if (!names.length) {
-    pdf.setFont(theme.bodyFamily, "italic");
-    pdf.setFontSize(Math.max(5.5, bodySize * 0.88));
-    pdf.setTextColor(...palette.subtitle);
-    pdf.text("Nessun ospite in elenco.", cx, y + 4, { align: "center" });
-    drawFooter();
-    pdf.setTextColor(0, 0, 0);
-    return;
-  }
-
-  pdf.setFont(theme.bodyFamily, theme.bodyStyle);
-  pdf.setTextColor(...palette.body);
-  const lineH = Math.max(1.9, bodySize * 0.34);
-  for (const n of names) {
-    const fsLine = segnatavoloFitGuestOneLineFontSize(pdf, theme, n, innerW, bodySize);
-    pdf.setFontSize(fsLine);
-    pdf.text(String(n), cx, y, { align: "center" });
-    y += lineH;
-    pdf.setFontSize(bodySize);
-  }
-  drawFooter();
-  pdf.setTextColor(0, 0, 0);
+    drawPdf.setTextColor(0, 0, 0);
   } finally {
-    if (targetRect) {
-      if (settings._drawCutFrame) {
-        pdf.setDrawColor(0, 0, 0);
-        pdf.setLineWidth(0.12);
-        pdf.rect(0, 0, W, H, "S");
-      }
-      pdf.internal.write("Q");
+    if (targetRect && settings._drawCutFrame) {
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.12);
+      pdf.rect(offsetX, offsetY, W, H, "S");
     }
   }
 }
@@ -5329,16 +5377,11 @@ function runSegnatavoliPdfExport() {
 function drawMenuBookletPanelFrame(pdf, x, y, w, h, palette) {
   const fid = segnatavoloSettings.festiveMarginId || null;
   const gi = Number(segnatavoloSettings.graphicIndex || 0);
-  const [tx, ty] = pdfRawTranslateFromMm(pdf, x, y);
-  pdf.internal.write(`q 1 0 0 1 ${tx} ${ty} cm`);
-  try {
-    if (fid) {
-      drawSegnatavoloFestiveMarginArt(pdf, w, h, palette, fid);
-    } else {
-      drawSegnatavoloGraphic(pdf, w, h, palette.deco, gi);
-    }
-  } finally {
-    pdf.internal.write("Q");
+  const drawPdf = segnatavoloOffsetPdf(pdf, x, y);
+  if (fid) {
+    drawSegnatavoloFestiveMarginArt(drawPdf, w, h, palette, fid);
+  } else {
+    drawSegnatavoloGraphic(drawPdf, w, h, palette.deco, gi);
   }
 }
 
