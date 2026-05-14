@@ -3945,6 +3945,15 @@ function getSegnatavoloPreviewTable() {
   };
 }
 
+/**
+ * jsPDF con unità "mm": i comandi grezzi (`cm`, ecc.) nel content stream usano lo spazio utente in pt.
+ * Moltiplica mm → fattore interno (di solito 72/25.4).
+ */
+function pdfRawTranslateFromMm(pdf, xMm, yMm) {
+  const k = pdf.internal.scaleFactor != null ? pdf.internal.scaleFactor : 72 / 25.4;
+  return [Number(xMm) * k, Number(yMm) * k];
+}
+
 function drawSegnatavoloPage(pdf, table, settings) {
   const theme = SEGNATAVOLO_THEMES.find((t) => t.id === settings.themeId) || SEGNATAVOLO_THEMES[0];
   const palette = settings._palette || getSegnatavoloPaletteResolved();
@@ -3986,7 +3995,8 @@ function drawSegnatavoloPage(pdf, table, settings) {
   }
 
   if (targetRect) {
-    pdf.internal.write(`q 1 0 0 1 ${offsetX} ${offsetY} cm`);
+    const [tx, ty] = pdfRawTranslateFromMm(pdf, offsetX, offsetY);
+    pdf.internal.write(`q 1 0 0 1 ${tx} ${ty} cm`);
   }
   try {
   const fid = settings.festiveMarginId || null;
@@ -5319,7 +5329,8 @@ function runSegnatavoliPdfExport() {
 function drawMenuBookletPanelFrame(pdf, x, y, w, h, palette) {
   const fid = segnatavoloSettings.festiveMarginId || null;
   const gi = Number(segnatavoloSettings.graphicIndex || 0);
-  pdf.internal.write(`q 1 0 0 1 ${x} ${y} cm`);
+  const [tx, ty] = pdfRawTranslateFromMm(pdf, x, y);
+  pdf.internal.write(`q 1 0 0 1 ${tx} ${ty} cm`);
   try {
     if (fid) {
       drawSegnatavoloFestiveMarginArt(pdf, w, h, palette, fid);
