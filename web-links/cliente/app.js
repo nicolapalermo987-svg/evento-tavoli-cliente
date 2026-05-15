@@ -3269,41 +3269,53 @@ function drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, festiveId) {
       break;
     }
     case "battesimo": {
-      // Stesso linguaggio di matrimonio (anelli oro, linee pulite) + comunione (calice) + tre onde minime (acqua).
+      // Stile come comunione/matrimonio (oro, contorni, poco riempimento); simboli: conchiglia + cero battesimale.
+      pdf.setFillColor(255, 252, 248);
       pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.32);
-      pdf.circle(6.35, 9.35, 1.45, "S");
-      pdf.circle(8.45, 9.35, 1.45, "S");
-      pdf.setLineWidth(0.18);
+      pdf.setLineWidth(0.26);
+      pdf.lines(
+        [
+          [0, 0],
+          [-1.25, 1.35],
+          [-0.85, 3.75],
+          [0, 4.95],
+          [0.85, 3.75],
+          [1.25, 1.35],
+          [0, 0],
+        ],
+        9,
+        7.72,
+        [1, 1],
+        "FD",
+        true
+      );
+      pdf.setLineWidth(0.11);
       pdf.setDrawColor(220, 200, 160);
-      pdf.line(5.2, 12.05, 6.1, 11.75);
-      pdf.line(6.1, 11.75, 7.0, 12.05);
-      pdf.line(7.0, 12.05, 7.9, 11.75);
-      pdf.line(7.9, 11.75, 8.8, 12.05);
-      pdf.line(8.8, 12.05, 9.7, 11.75);
+      pdf.line(9, 8.45, 9, 12.55);
+      pdf.line(7.95, 8.95, 8.32, 11.85);
+      pdf.line(10.05, 8.95, 9.68, 11.85);
       pdf.setDrawColor(...gold);
       pdf.setFillColor(...white);
-      pdf.circle(7.4, 9.35, 0.22, "F");
+      pdf.circle(9, 8.05, 0.2, "F");
 
-      // Basso destra: calice con ostia (stesso schema della comunione).
-      pdf.setFillColor(248, 241, 224);
-      pdf.ellipse(W - 9.6, H - 11.2, 2.1, 1.05, "F");
-      pdf.setFillColor(236, 224, 195);
-      pdf.rect(W - 10.05, H - 10.2, 0.9, 2.2, "F");
-      pdf.ellipse(W - 9.6, H - 7.6, 1.45, 0.45, "F");
+      const wx = W - 9.55;
       pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.22);
-      pdf.ellipse(W - 9.6, H - 11.2, 2.1, 1.05, "S");
-      pdf.rect(W - 10.05, H - 10.2, 0.9, 2.2, "S");
-      pdf.ellipse(W - 9.6, H - 7.6, 1.45, 0.45, "S");
-      pdf.setFillColor(255, 252, 244);
-      pdf.circle(W - 9.6, H - 13.2, 1.0, "F");
-      pdf.setDrawColor(230, 208, 150);
-      pdf.circle(W - 9.6, H - 13.2, 1.0, "S");
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.18);
-      pdf.line(W - 9.6, H - 14, W - 9.6, H - 12.4);
-      pdf.line(W - 10.3, H - 13.2, W - 8.9, H - 13.2);
+      pdf.setLineWidth(0.24);
+      pdf.line(wx - 0.48, H - 7.35, wx - 0.48, H - 13.12);
+      pdf.line(wx + 0.48, H - 7.35, wx + 0.48, H - 13.12);
+      pdf.line(wx - 0.58, H - 7.35, wx + 0.58, H - 7.35);
+      pdf.line(wx - 0.52, H - 13.12, wx + 0.52, H - 13.12);
+      pdf.setLineWidth(0.17);
+      pdf.line(wx, H - 15.05, wx - 0.34, H - 13.22);
+      pdf.line(wx, H - 15.05, wx + 0.34, H - 13.22);
+      pdf.line(wx - 0.34, H - 13.22, wx + 0.34, H - 13.22);
+      pdf.setLineWidth(0.16);
+      pdf.line(wx, H - 12.0, wx, H - 9.55);
+      pdf.line(wx - 0.4, H - 10.75, wx + 0.4, H - 10.75);
+      pdf.setLineWidth(0.12);
+      pdf.setDrawColor(220, 200, 160);
+      pdf.line(wx - 1.15, H - 6.85, wx - 0.35, H - 6.95);
+      pdf.line(wx + 0.35, H - 6.95, wx + 1.15, H - 6.85);
       break;
     }
     case "compleanno": {
@@ -3737,17 +3749,20 @@ function buildSegnatavoloFestivePreviewInnerHTML(palette, festiveId) {
       </svg>`;
     case "battesimo":
       return `${svgStart}
-        <circle cx="6.35" cy="9.35" r="1.45" fill="none" stroke="${c(gold)}" stroke-width="0.32"/>
-        <circle cx="8.45" cy="9.35" r="1.45" fill="none" stroke="${c(gold)}" stroke-width="0.32"/>
-        <polyline points="5.2,12.05 6.1,11.75 7,12.05 7.9,11.75 8.8,12.05 9.7,11.75" fill="none" stroke="rgb(220,200,160)" stroke-width="0.18" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="7.4" cy="9.35" r="0.22" fill="${c(white)}"/>
+        <path d="M9 7.72 L7.75 9.07 L8.15 11.47 L9 12.67 L9.85 11.47 L10.25 9.07 Z" fill="rgb(255,252,248)" stroke="${c(gold)}" stroke-width="0.26" stroke-linejoin="round"/>
+        <line x1="9" y1="8.45" x2="9" y2="12.55" stroke="rgb(220,200,160)" stroke-width="0.11"/>
+        <line x1="7.95" y1="8.95" x2="8.32" y2="11.85" stroke="rgb(220,200,160)" stroke-width="0.11"/>
+        <line x1="10.05" y1="8.95" x2="9.68" y2="11.85" stroke="rgb(220,200,160)" stroke-width="0.11"/>
+        <circle cx="9" cy="8.05" r="0.2" fill="${c(white)}"/>
 
-        <ellipse cx="${W - 9.6}" cy="${H - 11.2}" rx="2.1" ry="1.05" fill="rgb(248,241,224)" stroke="${c(gold)}" stroke-width="0.22"/>
-        <rect x="${W - 10.05}" y="${H - 10.2}" width="0.9" height="2.2" fill="rgb(236,224,195)" stroke="${c(gold)}" stroke-width="0.22"/>
-        <ellipse cx="${W - 9.6}" cy="${H - 7.6}" rx="1.45" ry="0.45" fill="rgb(236,224,195)" stroke="${c(gold)}" stroke-width="0.22"/>
-        <circle cx="${W - 9.6}" cy="${H - 13.2}" r="1.0" fill="rgb(255,252,244)" stroke="rgb(230,208,150)" stroke-width="0.2"/>
-        <line x1="${W - 9.6}" y1="${H - 14}" x2="${W - 9.6}" y2="${H - 12.4}" stroke="${c(gold)}" stroke-width="0.18"/>
-        <line x1="${W - 10.3}" y1="${H - 13.2}" x2="${W - 8.9}" y2="${H - 13.2}" stroke="${c(gold)}" stroke-width="0.18"/>
+        <line x1="${W - 10.03}" y1="${H - 7.35}" x2="${W - 10.03}" y2="${H - 13.12}" stroke="${c(gold)}" stroke-width="0.24"/>
+        <line x1="${W - 9.07}" y1="${H - 7.35}" x2="${W - 9.07}" y2="${H - 13.12}" stroke="${c(gold)}" stroke-width="0.24"/>
+        <line x1="${W - 10.13}" y1="${H - 7.35}" x2="${W - 8.97}" y2="${H - 7.35}" stroke="${c(gold)}" stroke-width="0.24"/>
+        <line x1="${W - 10.07}" y1="${H - 13.12}" x2="${W - 9.03}" y2="${H - 13.12}" stroke="${c(gold)}" stroke-width="0.24"/>
+        <polygon points="${W - 9.55},${H - 15.05} ${W - 9.89},${H - 13.22} ${W - 9.21},${H - 13.22}" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linejoin="round"/>
+        <line x1="${W - 9.55}" y1="${H - 12}" x2="${W - 9.55}" y2="${H - 9.55}" stroke="${c(gold)}" stroke-width="0.16"/>
+        <line x1="${W - 9.95}" y1="${H - 10.75}" x2="${W - 9.15}" y2="${H - 10.75}" stroke="${c(gold)}" stroke-width="0.16"/>
+        <path d="M${W - 10.7} ${H - 6.85} Q${W - 9.55} ${H - 7.05} ${W - 8.4} ${H - 6.85}" fill="none" stroke="rgb(220,200,160)" stroke-width="0.12"/>
       </svg>`;
     case "compleanno":
       return `${svgStart}
