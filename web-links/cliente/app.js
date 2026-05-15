@@ -1978,7 +1978,6 @@ const SEGNATAVOLO_GRAPHICS = [
   { id: 5, label: "Diagonali angolo" },
   { id: 6, label: "Trama punti (margini)" },
   { id: 7, label: "Colonne laterali" },
-  { id: 8, label: "Losanga in alto" },
   { id: 9, label: "Tratteggio fascia" },
 ];
 
@@ -1993,7 +1992,7 @@ const SEGNATAVOLO_OCCASIONS = [
   { id: "matrimonio", label: "Matrimonio", themeId: "t1", paletteId: "p3", graphicIndex: 1 },
   { id: "diciottesimo", label: "Diciottesimo", themeId: "t8", paletteId: "p3", graphicIndex: 9 },
   { id: "compleanno", label: "Compleanno", themeId: "t10", paletteId: "p7", graphicIndex: 3 },
-  { id: "laurea", label: "Laurea", themeId: "t7", paletteId: "p9", graphicIndex: 8 },
+  { id: "laurea", label: "Laurea", themeId: "t7", paletteId: "p9", graphicIndex: 7 },
 ];
 
 const DEFAULT_SEGNATAVOLO_SETTINGS = {
@@ -2433,6 +2432,7 @@ function loadSegnatavoloSettings() {
       }
     }
   } catch (_) {}
+  if (segnatavoloSettings.graphicIndex === 8) segnatavoloSettings.graphicIndex = 7;
   if (els.segnatavoloColorTitle) {
     els.segnatavoloColorTitle.value = segnatavoloSettings.customTitleHex;
     els.segnatavoloColorBody.value = segnatavoloSettings.customBodyHex;
@@ -2866,16 +2866,6 @@ function drawSegnatavoloGraphic(pdf, W, H, decoRgb, idx) {
       pdf.line(8, 20, 8, H - 20);
       pdf.line(W - 8, 20, W - 8, H - 20);
       break;
-    case 8: {
-      const cx = W / 2;
-      const cy = 7;
-      const s = 3.5;
-      pdf.line(cx, cy - s, cx + s, cy);
-      pdf.line(cx + s, cy, cx, cy + s);
-      pdf.line(cx, cy + s, cx - s, cy);
-      pdf.line(cx - s, cy, cx, cy - s);
-      break;
-    }
     case 9: {
       pdf.setLineWidth(0.2);
       for (let x = m; x < W - m - 1; x += 2.2) {
@@ -3279,26 +3269,50 @@ function drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, festiveId) {
       break;
     }
     case "battesimo": {
-      // SOLO 2 simboli: colomba oro + calice (stile comunione).
-      const doveGold = festiveMix(gold, [230, 180, 70], 0.35);
-      const doveOutline = festiveMix(doveGold, [140, 105, 45], 0.45);
-      pdf.setFillColor(...doveGold);
-      pdf.setDrawColor(...doveOutline);
-      pdf.setLineWidth(0.22);
-      // Colomba oro (alto sinistra) - silhouette più pulita.
-      pdf.ellipse(8.9, 9.9, 2.45, 1.05, "FD"); // corpo
-      pdf.ellipse(7.05, 8.55, 1.65, 0.68, "FD"); // ala sinistra
-      pdf.ellipse(10.45, 8.55, 1.65, 0.68, "FD"); // ala destra
-      pdf.ellipse(10.95, 9.55, 0.52, 0.45, "FD"); // testa
-      // coda
-      pdf.lines([[0, 0], [-1.35, 0.42], [-2.55, -0.12], [-1.7, 0.95], [-0.45, 0.72], [0.35, 0.2]], 6.9, 10.35, [1, 1], "FD", true);
-      // dettaglio piuma centrale
-      pdf.setLineWidth(0.14);
-      pdf.line(8.0, 9.15, 9.95, 9.15);
-      pdf.setFillColor(255, 248, 228);
-      pdf.circle(11.02, 9.5, 0.07, "F");
-      pdf.setFillColor(...doveGold);
-      pdf.triangle(11.35, 9.62, 12.0, 9.42, 11.38, 9.9, "F");
+      // Conchiglia (iconografia battesimale) + calice con ostia (basso destra).
+      const shellGold = festiveMix(gold, [230, 180, 70], 0.35);
+      const shellOutline = festiveMix(shellGold, [140, 105, 45], 0.45);
+      const creamHl = [255, 248, 228];
+      pdf.setFillColor(...shellGold);
+      pdf.setDrawColor(...shellOutline);
+      pdf.setLineWidth(0.2);
+      const bx = 9;
+      const by = 7.75;
+      pdf.lines(
+        [
+          [0, 0],
+          [-2.15, 0.95],
+          [-2.55, 2.95],
+          [-1.85, 4.5],
+          [-0.55, 5.35],
+          [0, 5.55],
+          [0.55, 5.35],
+          [1.85, 4.5],
+          [2.55, 2.95],
+          [2.15, 0.95],
+          [0, 0],
+        ],
+        bx,
+        by,
+        [1, 1],
+        "FD",
+        true
+      );
+      pdf.setLineWidth(0.11);
+      pdf.setDrawColor(...festiveMix(shellOutline, creamHl, 0.35));
+      pdf.line(bx, by + 1.0, bx, by + 5.05);
+      pdf.line(bx - 1.05, by + 1.55, bx - 0.35, by + 4.85);
+      pdf.line(bx + 1.05, by + 1.55, bx + 0.35, by + 4.85);
+      pdf.line(bx - 1.72, by + 2.15, bx - 0.72, by + 3.95);
+      pdf.line(bx + 1.72, by + 2.15, bx + 0.72, by + 3.95);
+      pdf.setFillColor(...creamHl);
+      pdf.circle(bx, by + 0.58, 0.3, "F");
+      pdf.setDrawColor(...shellOutline);
+      pdf.setLineWidth(0.12);
+      pdf.circle(bx, by + 0.58, 0.3, "S");
+      pdf.setFillColor(...festiveMix(shellGold, creamHl, 0.45));
+      pdf.setDrawColor(...shellOutline);
+      pdf.ellipse(bx, by + 5.48, 1.05, 0.36, "FD");
 
       // Calice con ostia (basso destra)
       pdf.setFillColor(248, 241, 224);
@@ -3752,14 +3766,14 @@ function buildSegnatavoloFestivePreviewInnerHTML(palette, festiveId) {
       </svg>`;
     case "battesimo":
       return `${svgStart}
-        <ellipse cx="8.9" cy="9.9" rx="2.45" ry="1.05" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.22"/>
-        <ellipse cx="7.05" cy="8.55" rx="1.65" ry="0.68" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.22"/>
-        <ellipse cx="10.45" cy="8.55" rx="1.65" ry="0.68" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.22"/>
-        <ellipse cx="10.95" cy="9.55" rx="0.52" ry="0.45" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.22"/>
-        <path d="M6.9 10.35 C6.0 10.7,4.9 10.45,4.35 10.9 C5.25 11.4,6.35 11.3,7.25 10.9 Z" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.22"/>
-        <line x1="8.0" y1="9.15" x2="9.95" y2="9.15" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.14"/>
-        <circle cx="11.02" cy="9.5" r="0.07" fill="rgb(255,248,228)"/>
-        <polygon points="11.35,9.62 12.0,9.42 11.38,9.9" fill="${c(festiveMix(gold, [230,180,70], 0.35))}"/>
+        <path d="M9 7.75 L6.85 8.7 L6.45 10.7 L7.15 12.25 L8.45 13.1 L9 13.3 L9.55 13.1 L10.85 12.25 L11.55 10.7 L11.15 8.7 Z" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.2"/>
+        <line x1="9" y1="8.75" x2="9" y2="12.8" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
+        <line x1="7.95" y1="9.3" x2="8.65" y2="12.6" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
+        <line x1="10.05" y1="9.3" x2="9.35" y2="12.6" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
+        <line x1="7.28" y1="9.9" x2="8.28" y2="11.9" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
+        <line x1="10.72" y1="9.9" x2="9.72" y2="11.9" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
+        <circle cx="9" cy="8.33" r="0.3" fill="rgb(255,248,228)" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.12"/>
+        <ellipse cx="9" cy="13.23" rx="1.05" ry="0.36" fill="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.45))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.14"/>
 
         <ellipse cx="${W - 9.6}" cy="${H - 11.2}" rx="2.1" ry="1.05" fill="rgb(248,241,224)" stroke="${c(gold)}" stroke-width="0.22"/>
         <rect x="${W - 10.05}" y="${H - 10.2}" width="0.9" height="2.2" fill="rgb(236,224,195)" stroke="${c(gold)}" stroke-width="0.22"/>
@@ -5800,6 +5814,7 @@ function applyFullProjectData(fullData) {
   }
   if (payload.segnatavoloSettings && typeof payload.segnatavoloSettings === "object") {
     segnatavoloSettings = { ...DEFAULT_SEGNATAVOLO_SETTINGS, ...payload.segnatavoloSettings };
+    if (segnatavoloSettings.graphicIndex === 8) segnatavoloSettings.graphicIndex = 7;
     saveSegnatavoloSettings();
   }
   if (payload.menuBookletState && typeof payload.menuBookletState === "object") {

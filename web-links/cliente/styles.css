@@ -2392,18 +2392,6 @@ select:focus {
   right: 4%;
 }
 
-.segnatavolo-deco--8::before {
-  content: "";
-  position: absolute;
-  top: 3%;
-  left: 50%;
-  width: 8%;
-  height: 8%;
-  border: 1.5px solid var(--seg-deco);
-  transform: translateX(-50%) rotate(45deg);
-  opacity: 0.65;
-}
-
 .segnatavolo-deco--9::before,
 .segnatavolo-deco--9::after {
   content: "";
