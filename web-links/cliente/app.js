@@ -3269,52 +3269,23 @@ function drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, festiveId) {
       break;
     }
     case "battesimo": {
-      // Conchiglia (iconografia battesimale) + calice con ostia (basso destra).
-      const shellGold = festiveMix(gold, [230, 180, 70], 0.35);
-      const shellOutline = festiveMix(shellGold, [140, 105, 45], 0.45);
-      const creamHl = [255, 248, 228];
-      pdf.setFillColor(...shellGold);
-      pdf.setDrawColor(...shellOutline);
-      pdf.setLineWidth(0.2);
-      const bx = 9;
-      const by = 7.75;
-      pdf.lines(
-        [
-          [0, 0],
-          [-2.15, 0.95],
-          [-2.55, 2.95],
-          [-1.85, 4.5],
-          [-0.55, 5.35],
-          [0, 5.55],
-          [0.55, 5.35],
-          [1.85, 4.5],
-          [2.55, 2.95],
-          [2.15, 0.95],
-          [0, 0],
-        ],
-        bx,
-        by,
-        [1, 1],
-        "FD",
-        true
-      );
-      pdf.setLineWidth(0.11);
-      pdf.setDrawColor(...festiveMix(shellOutline, creamHl, 0.35));
-      pdf.line(bx, by + 1.0, bx, by + 5.05);
-      pdf.line(bx - 1.05, by + 1.55, bx - 0.35, by + 4.85);
-      pdf.line(bx + 1.05, by + 1.55, bx + 0.35, by + 4.85);
-      pdf.line(bx - 1.72, by + 2.15, bx - 0.72, by + 3.95);
-      pdf.line(bx + 1.72, by + 2.15, bx + 0.72, by + 3.95);
-      pdf.setFillColor(...creamHl);
-      pdf.circle(bx, by + 0.58, 0.3, "F");
-      pdf.setDrawColor(...shellOutline);
-      pdf.setLineWidth(0.12);
-      pdf.circle(bx, by + 0.58, 0.3, "S");
-      pdf.setFillColor(...festiveMix(shellGold, creamHl, 0.45));
-      pdf.setDrawColor(...shellOutline);
-      pdf.ellipse(bx, by + 5.48, 1.05, 0.36, "FD");
+      // Stesso linguaggio di matrimonio (anelli oro, linee pulite) + comunione (calice) + tre onde minime (acqua).
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(0.32);
+      pdf.circle(6.35, 9.35, 1.45, "S");
+      pdf.circle(8.45, 9.35, 1.45, "S");
+      pdf.setLineWidth(0.18);
+      pdf.setDrawColor(220, 200, 160);
+      pdf.line(5.2, 12.05, 6.1, 11.75);
+      pdf.line(6.1, 11.75, 7.0, 12.05);
+      pdf.line(7.0, 12.05, 7.9, 11.75);
+      pdf.line(7.9, 11.75, 8.8, 12.05);
+      pdf.line(8.8, 12.05, 9.7, 11.75);
+      pdf.setDrawColor(...gold);
+      pdf.setFillColor(...white);
+      pdf.circle(7.4, 9.35, 0.22, "F");
 
-      // Calice con ostia (basso destra)
+      // Basso destra: calice con ostia (stesso schema della comunione).
       pdf.setFillColor(248, 241, 224);
       pdf.ellipse(W - 9.6, H - 11.2, 2.1, 1.05, "F");
       pdf.setFillColor(236, 224, 195);
@@ -3766,14 +3737,10 @@ function buildSegnatavoloFestivePreviewInnerHTML(palette, festiveId) {
       </svg>`;
     case "battesimo":
       return `${svgStart}
-        <path d="M9 7.75 L6.85 8.7 L6.45 10.7 L7.15 12.25 L8.45 13.1 L9 13.3 L9.55 13.1 L10.85 12.25 L11.55 10.7 L11.15 8.7 Z" fill="${c(festiveMix(gold, [230,180,70], 0.35))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.2"/>
-        <line x1="9" y1="8.75" x2="9" y2="12.8" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
-        <line x1="7.95" y1="9.3" x2="8.65" y2="12.6" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
-        <line x1="10.05" y1="9.3" x2="9.35" y2="12.6" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
-        <line x1="7.28" y1="9.9" x2="8.28" y2="11.9" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
-        <line x1="10.72" y1="9.9" x2="9.72" y2="11.9" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.4))}" stroke-width="0.11"/>
-        <circle cx="9" cy="8.33" r="0.3" fill="rgb(255,248,228)" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.12"/>
-        <ellipse cx="9" cy="13.23" rx="1.05" ry="0.36" fill="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [255,248,228], 0.45))}" stroke="${c(festiveMix(festiveMix(gold, [230,180,70], 0.35), [140,105,45], 0.45))}" stroke-width="0.14"/>
+        <circle cx="6.35" cy="9.35" r="1.45" fill="none" stroke="${c(gold)}" stroke-width="0.32"/>
+        <circle cx="8.45" cy="9.35" r="1.45" fill="none" stroke="${c(gold)}" stroke-width="0.32"/>
+        <polyline points="5.2,12.05 6.1,11.75 7,12.05 7.9,11.75 8.8,12.05 9.7,11.75" fill="none" stroke="rgb(220,200,160)" stroke-width="0.18" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="7.4" cy="9.35" r="0.22" fill="${c(white)}"/>
 
         <ellipse cx="${W - 9.6}" cy="${H - 11.2}" rx="2.1" ry="1.05" fill="rgb(248,241,224)" stroke="${c(gold)}" stroke-width="0.22"/>
         <rect x="${W - 10.05}" y="${H - 10.2}" width="0.9" height="2.2" fill="rgb(236,224,195)" stroke="${c(gold)}" stroke-width="0.22"/>
