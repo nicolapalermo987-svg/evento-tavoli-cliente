@@ -5351,13 +5351,17 @@ function runSegnatavoliPdfExport() {
     _layout: batchLayoutImpose,
   };
 
+  /** Piccolo scarto tra area utile imposizione e lato foglio A4: centriamo così il blocco non “cade” tutto in basso/destra. */
+  const imposeOriginX = (pageW - grid.usedW) / 2;
+  const imposeOriginY = (pageH - grid.usedH) / 2;
+
   let t = 0;
   while (t < ordered.length) {
     if (t > 0) pdfImpose.addPage();
     for (let j = 0; j < grid.ny && t < ordered.length; j++) {
       for (let i = 0; i < grid.nx && t < ordered.length; i++) {
-        const x = i * (cw - delta);
-        const y = j * (ch - delta);
+        const x = imposeOriginX + i * (cw - delta);
+        const y = imposeOriginY + j * (ch - delta);
         drawSegnatavoloPage(pdfImpose, ordered[t], {
           ...optsImpose,
           _targetRect: { x, y, w: cw, h: ch },
