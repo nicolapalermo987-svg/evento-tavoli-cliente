@@ -5280,7 +5280,7 @@ function runSegnatavoliPdfExport() {
   }
 
   const orientation = segnatavoloSettings.paperOrientation === "landscape" ? "landscape" : "portrait";
-  const { key: formatKey } = getSegnatavoloPdfFormatAndKey();
+  const { key: formatKey, format } = getSegnatavoloPdfFormatAndKey();
   const palette = getSegnatavoloPaletteResolved();
   const theme = getSegnatavoloTheme();
   const ordered = [...state.tables].sort((a, b) => Number(a.number) - Number(b.number));
