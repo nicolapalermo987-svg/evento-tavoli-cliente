@@ -3269,53 +3269,53 @@ function drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, festiveId) {
       break;
     }
     case "battesimo": {
-      // Stile come comunione/matrimonio (oro, contorni, poco riempimento); simboli: conchiglia + cero battesimale.
+      // Alto sinistra: goccia + tre onde (acqua). Basso destra: fonte battesimale (vasca + onda interna).
       pdf.setFillColor(255, 252, 248);
       pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.26);
+      pdf.setLineWidth(0.22);
       pdf.lines(
-        [
-          [0, 0],
-          [-1.25, 1.35],
-          [-0.85, 3.75],
-          [0, 4.95],
-          [0.85, 3.75],
-          [1.25, 1.35],
-          [0, 0],
-        ],
-        9,
-        7.72,
+        [[0, 0], [-0.42, 0.55], [-0.28, 1.18], [0, 1.52], [0.28, 1.18], [0.42, 0.55], [0, 0]],
+        8.6,
+        7.9,
         [1, 1],
         "FD",
         true
       );
-      pdf.setLineWidth(0.11);
-      pdf.setDrawColor(220, 200, 160);
-      pdf.line(9, 8.45, 9, 12.55);
-      pdf.line(7.95, 8.95, 8.32, 11.85);
-      pdf.line(10.05, 8.95, 9.68, 11.85);
-      pdf.setDrawColor(...gold);
       pdf.setFillColor(...white);
-      pdf.circle(9, 8.05, 0.2, "F");
-
-      const wx = W - 9.55;
+      pdf.circle(8.6, 8.22, 0.11, "F");
       pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.24);
-      pdf.line(wx - 0.48, H - 7.35, wx - 0.48, H - 13.12);
-      pdf.line(wx + 0.48, H - 7.35, wx + 0.48, H - 13.12);
-      pdf.line(wx - 0.58, H - 7.35, wx + 0.58, H - 7.35);
-      pdf.line(wx - 0.52, H - 13.12, wx + 0.52, H - 13.12);
       pdf.setLineWidth(0.17);
-      pdf.line(wx, H - 15.05, wx - 0.34, H - 13.22);
-      pdf.line(wx, H - 15.05, wx + 0.34, H - 13.22);
-      pdf.line(wx - 0.34, H - 13.22, wx + 0.34, H - 13.22);
-      pdf.setLineWidth(0.16);
-      pdf.line(wx, H - 12.0, wx, H - 9.55);
-      pdf.line(wx - 0.4, H - 10.75, wx + 0.4, H - 10.75);
+      const waves = [
+        { y0: 10.12, a: 0.22 },
+        { y0: 10.88, a: 0.2 },
+        { y0: 11.58, a: 0.17 },
+      ];
+      for (const { y0, a } of waves) {
+        pdf.line(5.1, y0, 6.15, y0 - a);
+        pdf.line(6.15, y0 - a, 7.25, y0 + a * 0.65);
+        pdf.line(7.25, y0 + a * 0.65, 8.4, y0 - a * 0.85);
+        pdf.line(8.4, y0 - a * 0.85, 9.55, y0 + a * 0.55);
+        pdf.line(9.55, y0 + a * 0.55, 10.65, y0 - a * 0.75);
+        pdf.line(10.65, y0 - a * 0.75, 11.75, y0);
+      }
+
+      const cx = W - 9.55;
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(0.22);
+      pdf.line(cx - 1.25, H - 12.65, cx + 1.25, H - 12.65);
+      pdf.line(cx - 1.25, H - 12.65, cx - 1.05, H - 7.92);
+      pdf.line(cx + 1.25, H - 12.65, cx + 1.05, H - 7.92);
+      pdf.line(cx - 1.05, H - 7.92, cx - 0.5, H - 7.25);
+      pdf.line(cx - 0.5, H - 7.25, cx, H - 6.95);
+      pdf.line(cx, H - 6.95, cx + 0.5, H - 7.25);
+      pdf.line(cx + 0.5, H - 7.25, cx + 1.05, H - 7.92);
       pdf.setLineWidth(0.12);
       pdf.setDrawColor(220, 200, 160);
-      pdf.line(wx - 1.15, H - 6.85, wx - 0.35, H - 6.95);
-      pdf.line(wx + 0.35, H - 6.95, wx + 1.15, H - 6.85);
+      const iy = H - 9.75;
+      pdf.line(cx - 0.92, iy, cx - 0.35, iy - 0.18);
+      pdf.line(cx - 0.35, iy - 0.18, cx + 0.1, iy + 0.12);
+      pdf.line(cx + 0.1, iy + 0.12, cx + 0.55, iy - 0.14);
+      pdf.line(cx + 0.55, iy - 0.14, cx + 0.95, iy);
       break;
     }
     case "compleanno": {
@@ -3749,20 +3749,17 @@ function buildSegnatavoloFestivePreviewInnerHTML(palette, festiveId) {
       </svg>`;
     case "battesimo":
       return `${svgStart}
-        <path d="M9 7.72 L7.75 9.07 L8.15 11.47 L9 12.67 L9.85 11.47 L10.25 9.07 Z" fill="rgb(255,252,248)" stroke="${c(gold)}" stroke-width="0.26" stroke-linejoin="round"/>
-        <line x1="9" y1="8.45" x2="9" y2="12.55" stroke="rgb(220,200,160)" stroke-width="0.11"/>
-        <line x1="7.95" y1="8.95" x2="8.32" y2="11.85" stroke="rgb(220,200,160)" stroke-width="0.11"/>
-        <line x1="10.05" y1="8.95" x2="9.68" y2="11.85" stroke="rgb(220,200,160)" stroke-width="0.11"/>
-        <circle cx="9" cy="8.05" r="0.2" fill="${c(white)}"/>
+        <path d="M8.6 7.9 L8.18 8.45 L8.32 9.08 L8.6 9.42 L8.88 9.08 L9.02 8.45 Z" fill="rgb(255,252,248)" stroke="${c(gold)}" stroke-width="0.22" stroke-linejoin="round"/>
+        <circle cx="8.6" cy="8.22" r="0.11" fill="${c(white)}"/>
+        <polyline points="5.1,10.12 6.15,9.9 7.25,10.263 8.4,9.933 9.55,10.241 10.65,9.955 11.75,10.12" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="5.1,10.88 6.15,10.68 7.25,11.01 8.4,10.71 9.55,10.99 10.65,10.73 11.75,10.88" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="5.1,11.58 6.15,11.41 7.25,11.6905 8.4,11.4355 9.55,11.6735 10.65,11.4525 11.75,11.58" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linecap="round" stroke-linejoin="round"/>
 
-        <line x1="${W - 10.03}" y1="${H - 7.35}" x2="${W - 10.03}" y2="${H - 13.12}" stroke="${c(gold)}" stroke-width="0.24"/>
-        <line x1="${W - 9.07}" y1="${H - 7.35}" x2="${W - 9.07}" y2="${H - 13.12}" stroke="${c(gold)}" stroke-width="0.24"/>
-        <line x1="${W - 10.13}" y1="${H - 7.35}" x2="${W - 8.97}" y2="${H - 7.35}" stroke="${c(gold)}" stroke-width="0.24"/>
-        <line x1="${W - 10.07}" y1="${H - 13.12}" x2="${W - 9.03}" y2="${H - 13.12}" stroke="${c(gold)}" stroke-width="0.24"/>
-        <polygon points="${W - 9.55},${H - 15.05} ${W - 9.89},${H - 13.22} ${W - 9.21},${H - 13.22}" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linejoin="round"/>
-        <line x1="${W - 9.55}" y1="${H - 12}" x2="${W - 9.55}" y2="${H - 9.55}" stroke="${c(gold)}" stroke-width="0.16"/>
-        <line x1="${W - 9.95}" y1="${H - 10.75}" x2="${W - 9.15}" y2="${H - 10.75}" stroke="${c(gold)}" stroke-width="0.16"/>
-        <path d="M${W - 10.7} ${H - 6.85} Q${W - 9.55} ${H - 7.05} ${W - 8.4} ${H - 6.85}" fill="none" stroke="rgb(220,200,160)" stroke-width="0.12"/>
+        <line x1="${W - 10.8}" y1="${H - 12.65}" x2="${W - 8.3}" y2="${H - 12.65}" stroke="${c(gold)}" stroke-width="0.22"/>
+        <line x1="${W - 10.8}" y1="${H - 12.65}" x2="${W - 10.6}" y2="${H - 7.92}" stroke="${c(gold)}" stroke-width="0.22"/>
+        <line x1="${W - 8.3}" y1="${H - 12.65}" x2="${W - 8.5}" y2="${H - 7.92}" stroke="${c(gold)}" stroke-width="0.22"/>
+        <path d="M${W - 10.6} ${H - 7.92} Q${W - 9.8} ${H - 7.25} ${W - 9.55} ${H - 6.95} Q${W - 9.3} ${H - 7.25} ${W - 8.5} ${H - 7.92}" fill="none" stroke="${c(gold)}" stroke-width="0.22" stroke-linejoin="round"/>
+        <polyline points="${W - 10.47},${H - 9.75} ${W - 9.9},${H - 9.93} ${W - 9.45},${H - 9.63} ${W - 9},${H - 9.61} ${W - 8.6},${H - 9.75}" fill="none" stroke="rgb(220,200,160)" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>`;
     case "compleanno":
       return `${svgStart}
