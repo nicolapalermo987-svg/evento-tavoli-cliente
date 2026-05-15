@@ -3269,53 +3269,33 @@ function drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, festiveId) {
       break;
     }
     case "battesimo": {
-      // Alto sinistra: goccia + tre onde (acqua). Basso destra: fonte battesimale (vasca + onda interna).
+      // Croce nel nimbus oro (alto sinistra) + gocciolina acqua (basso destra).
+      const ncx = 8.85;
+      const ncy = 10.0;
+      const nr = 2.08;
       pdf.setFillColor(255, 252, 248);
       pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.22);
+      pdf.setLineWidth(0.26);
+      pdf.circle(ncx, ncy, nr, "FD");
+      pdf.setLineWidth(0.2);
+      pdf.line(ncx, ncy - nr + 0.22, ncx, ncy + nr - 0.22);
+      pdf.line(ncx - nr + 0.22, ncy, ncx + nr - 0.22, ncy);
+
+      const dx = W - 9.55;
+      const dy = H - 10.32;
+      pdf.setFillColor(248, 252, 255);
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(0.19);
       pdf.lines(
-        [[0, 0], [-0.42, 0.55], [-0.28, 1.18], [0, 1.52], [0.28, 1.18], [0.42, 0.55], [0, 0]],
-        8.6,
-        7.9,
+        [[0, 0], [-0.3, 0.4], [-0.18, 0.92], [0, 1.2], [0.18, 0.92], [0.3, 0.4], [0, 0]],
+        dx,
+        dy,
         [1, 1],
         "FD",
         true
       );
-      pdf.setFillColor(...white);
-      pdf.circle(8.6, 8.22, 0.11, "F");
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.17);
-      const waves = [
-        { y0: 10.12, a: 0.22 },
-        { y0: 10.88, a: 0.2 },
-        { y0: 11.58, a: 0.17 },
-      ];
-      for (const { y0, a } of waves) {
-        pdf.line(5.1, y0, 6.15, y0 - a);
-        pdf.line(6.15, y0 - a, 7.25, y0 + a * 0.65);
-        pdf.line(7.25, y0 + a * 0.65, 8.4, y0 - a * 0.85);
-        pdf.line(8.4, y0 - a * 0.85, 9.55, y0 + a * 0.55);
-        pdf.line(9.55, y0 + a * 0.55, 10.65, y0 - a * 0.75);
-        pdf.line(10.65, y0 - a * 0.75, 11.75, y0);
-      }
-
-      const cx = W - 9.55;
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.22);
-      pdf.line(cx - 1.25, H - 12.65, cx + 1.25, H - 12.65);
-      pdf.line(cx - 1.25, H - 12.65, cx - 1.05, H - 7.92);
-      pdf.line(cx + 1.25, H - 12.65, cx + 1.05, H - 7.92);
-      pdf.line(cx - 1.05, H - 7.92, cx - 0.5, H - 7.25);
-      pdf.line(cx - 0.5, H - 7.25, cx, H - 6.95);
-      pdf.line(cx, H - 6.95, cx + 0.5, H - 7.25);
-      pdf.line(cx + 0.5, H - 7.25, cx + 1.05, H - 7.92);
-      pdf.setLineWidth(0.12);
-      pdf.setDrawColor(220, 200, 160);
-      const iy = H - 9.75;
-      pdf.line(cx - 0.92, iy, cx - 0.35, iy - 0.18);
-      pdf.line(cx - 0.35, iy - 0.18, cx + 0.1, iy + 0.12);
-      pdf.line(cx + 0.1, iy + 0.12, cx + 0.55, iy - 0.14);
-      pdf.line(cx + 0.55, iy - 0.14, cx + 0.95, iy);
+      pdf.setFillColor(255, 255, 255);
+      pdf.circle(dx - 0.1, dy + 0.42, 0.07, "F");
       break;
     }
     case "compleanno": {
@@ -3749,17 +3729,12 @@ function buildSegnatavoloFestivePreviewInnerHTML(palette, festiveId) {
       </svg>`;
     case "battesimo":
       return `${svgStart}
-        <path d="M8.6 7.9 L8.18 8.45 L8.32 9.08 L8.6 9.42 L8.88 9.08 L9.02 8.45 Z" fill="rgb(255,252,248)" stroke="${c(gold)}" stroke-width="0.22" stroke-linejoin="round"/>
-        <circle cx="8.6" cy="8.22" r="0.11" fill="${c(white)}"/>
-        <polyline points="5.1,10.12 6.15,9.9 7.25,10.263 8.4,9.933 9.55,10.241 10.65,9.955 11.75,10.12" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="5.1,10.88 6.15,10.68 7.25,11.01 8.4,10.71 9.55,10.99 10.65,10.73 11.75,10.88" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="5.1,11.58 6.15,11.41 7.25,11.6905 8.4,11.4355 9.55,11.6735 10.65,11.4525 11.75,11.58" fill="none" stroke="${c(gold)}" stroke-width="0.17" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="8.85" cy="10" r="2.08" fill="rgb(255,252,248)" stroke="${c(gold)}" stroke-width="0.26"/>
+        <line x1="8.85" y1="8.14" x2="8.85" y2="11.86" stroke="${c(gold)}" stroke-width="0.2"/>
+        <line x1="6.99" y1="10" x2="10.71" y2="10" stroke="${c(gold)}" stroke-width="0.2"/>
 
-        <line x1="${W - 10.8}" y1="${H - 12.65}" x2="${W - 8.3}" y2="${H - 12.65}" stroke="${c(gold)}" stroke-width="0.22"/>
-        <line x1="${W - 10.8}" y1="${H - 12.65}" x2="${W - 10.6}" y2="${H - 7.92}" stroke="${c(gold)}" stroke-width="0.22"/>
-        <line x1="${W - 8.3}" y1="${H - 12.65}" x2="${W - 8.5}" y2="${H - 7.92}" stroke="${c(gold)}" stroke-width="0.22"/>
-        <path d="M${W - 10.6} ${H - 7.92} Q${W - 9.8} ${H - 7.25} ${W - 9.55} ${H - 6.95} Q${W - 9.3} ${H - 7.25} ${W - 8.5} ${H - 7.92}" fill="none" stroke="${c(gold)}" stroke-width="0.22" stroke-linejoin="round"/>
-        <polyline points="${W - 10.47},${H - 9.75} ${W - 9.9},${H - 9.93} ${W - 9.45},${H - 9.63} ${W - 9},${H - 9.61} ${W - 8.6},${H - 9.75}" fill="none" stroke="rgb(220,200,160)" stroke-width="0.12" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M${W - 9.55} ${H - 10.32} L${W - 9.85} ${H - 9.92} L${W - 9.73} ${H - 9.4} L${W - 9.55} ${H - 9.12} L${W - 9.37} ${H - 9.4} L${W - 9.25} ${H - 9.92} Z" fill="rgb(248,252,255)" stroke="${c(gold)}" stroke-width="0.19" stroke-linejoin="round"/>
+        <circle cx="${W - 9.65}" cy="${H - 9.9}" r="0.07" fill="rgb(255,255,255)"/>
       </svg>`;
     case "compleanno":
       return `${svgStart}
