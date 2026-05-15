@@ -1987,7 +1987,6 @@ const SEGNATAVOLO_GRAPHICS = [
  */
 const SEGNATAVOLO_OCCASIONS = [
   { id: "none", label: "Generica", themeId: "t1", paletteId: "p1", graphicIndex: 0 },
-  { id: "battesimo", label: "Battesimo", themeId: "t2", paletteId: "p1", graphicIndex: 1 },
   { id: "comunione", label: "Comunione", themeId: "t9", paletteId: "p5", graphicIndex: 1 },
   { id: "matrimonio", label: "Matrimonio", themeId: "t1", paletteId: "p3", graphicIndex: 1 },
   { id: "diciottesimo", label: "Diciottesimo", themeId: "t8", paletteId: "p3", graphicIndex: 9 },
@@ -3268,36 +3267,6 @@ function drawSegnatavoloFestiveMarginArt(pdf, W, H, palette, festiveId) {
       }
       break;
     }
-    case "battesimo": {
-      // Croce nel nimbus oro (alto sinistra) + gocciolina acqua (basso destra).
-      const ncx = 8.85;
-      const ncy = 10.0;
-      const nr = 2.08;
-      pdf.setFillColor(255, 252, 248);
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.26);
-      pdf.circle(ncx, ncy, nr, "FD");
-      pdf.setLineWidth(0.2);
-      pdf.line(ncx, ncy - nr + 0.22, ncx, ncy + nr - 0.22);
-      pdf.line(ncx - nr + 0.22, ncy, ncx + nr - 0.22, ncy);
-
-      const dx = W - 9.55;
-      const dy = H - 10.32;
-      pdf.setFillColor(248, 252, 255);
-      pdf.setDrawColor(...gold);
-      pdf.setLineWidth(0.19);
-      pdf.lines(
-        [[0, 0], [-0.3, 0.4], [-0.18, 0.92], [0, 1.2], [0.18, 0.92], [0.3, 0.4], [0, 0]],
-        dx,
-        dy,
-        [1, 1],
-        "FD",
-        true
-      );
-      pdf.setFillColor(255, 255, 255);
-      pdf.circle(dx - 0.1, dy + 0.42, 0.07, "F");
-      break;
-    }
     case "compleanno": {
       pdf.setFillColor(...pink);
       pdf.rect(4, H - 8, 8, 2.2, "F");
@@ -3726,15 +3695,6 @@ function buildSegnatavoloFestivePreviewInnerHTML(palette, festiveId) {
               <polygon points="${W - 9},${H - 12} ${W - 8},${H - 12.8} ${W - 7},${H - 12} ${W - 8},${H - 10.5}" fill="${c(pink)}"/>
             `
         }
-      </svg>`;
-    case "battesimo":
-      return `${svgStart}
-        <circle cx="8.85" cy="10" r="2.08" fill="rgb(255,252,248)" stroke="${c(gold)}" stroke-width="0.26"/>
-        <line x1="8.85" y1="8.14" x2="8.85" y2="11.86" stroke="${c(gold)}" stroke-width="0.2"/>
-        <line x1="6.99" y1="10" x2="10.71" y2="10" stroke="${c(gold)}" stroke-width="0.2"/>
-
-        <path d="M${W - 9.55} ${H - 10.32} L${W - 9.85} ${H - 9.92} L${W - 9.73} ${H - 9.4} L${W - 9.55} ${H - 9.12} L${W - 9.37} ${H - 9.4} L${W - 9.25} ${H - 9.92} Z" fill="rgb(248,252,255)" stroke="${c(gold)}" stroke-width="0.19" stroke-linejoin="round"/>
-        <circle cx="${W - 9.65}" cy="${H - 9.9}" r="0.07" fill="rgb(255,255,255)"/>
       </svg>`;
     case "compleanno":
       return `${svgStart}
