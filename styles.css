@@ -1820,7 +1820,11 @@ select:focus {
 .pdf-sample-sheet__title {
   font-weight: 700;
   line-height: 1.15;
-  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .pdf-sample-sheet__subtitle {
@@ -2162,6 +2166,8 @@ select:focus {
   font-weight: 700;
   line-height: 1.15;
   margin: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow-wrap: normal;
   word-break: normal;
   hyphens: none;
@@ -2171,6 +2177,8 @@ select:focus {
   font-size: 0.72em;
   margin-top: 0.25em;
   opacity: 0.85;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow-wrap: normal;
   word-break: normal;
   hyphens: none;

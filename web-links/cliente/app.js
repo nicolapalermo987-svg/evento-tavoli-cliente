@@ -2198,17 +2198,31 @@ function getSegnatavoloHeaderParts(table, settingsOverride) {
 
 /** Margine di sicurezza stampa: 10% su ogni lato (stesso valore per anteprima e PDF). */
 const SEGNATAVOLO_SAFE_MARGIN_FRAC = 0.1;
+/** Padding orizzontale extra sul titolo (getTextWidth jsPDF sottostima spesso grassetto/maiuscole). */
+const SEGNATAVOLO_HEADER_SIDE_PAD_MM = 2;
+/** Fattore correttivo sulla larghezza misurata in PDF. */
+const SEGNATAVOLO_PDF_TEXT_WIDTH_FACTOR = 1.12;
 
 function segnatavoloTitleLineHeightMm(fontSizePt) {
   return Math.max(5.2, fontSizePt * 0.42);
+}
+
+function segnatavoloHeaderTextMaxWidthMm(innerW) {
+  return Math.max(10, innerW - 2 * SEGNATAVOLO_HEADER_SIDE_PAD_MM);
+}
+
+function segnatavoloPdfTextWidthMm(pdf, text) {
+  if (typeof pdf.getTextWidth !== "function") return 0;
+  return pdf.getTextWidth(String(text || "")) * SEGNATAVOLO_PDF_TEXT_WIDTH_FACTOR;
 }
 
 /** A capo solo tra parole (mai spezzare una parola a metà riga). */
 function segnatavoloSplitTextToSizeByWords(pdf, text, maxWidthMm) {
   const raw = String(text || "").trim();
   if (!raw) return [];
+  const maxW = segnatavoloHeaderTextMaxWidthMm(maxWidthMm);
   if (typeof pdf.getTextWidth !== "function") {
-    return pdf.splitTextToSize(raw, maxWidthMm);
+    return pdf.splitTextToSize(raw, maxW);
   }
   const words = raw.split(/\s+/).filter(Boolean);
   if (!words.length) return [];
@@ -2216,7 +2230,7 @@ function segnatavoloSplitTextToSizeByWords(pdf, text, maxWidthMm) {
   let current = "";
   for (const word of words) {
     const trial = current ? `${current} ${word}` : word;
-    if (pdf.getTextWidth(trial) <= maxWidthMm + 0.02) {
+    if (segnatavoloPdfTextWidthMm(pdf, trial) <= maxW) {
       current = trial;
     } else {
       if (current) lines.push(current);
@@ -2227,18 +2241,25 @@ function segnatavoloSplitTextToSizeByWords(pdf, text, maxWidthMm) {
   return lines;
 }
 
-/** Ogni parola del titolo deve entrare in una riga senza essere spezzata. */
-function segnatavoloTableTitleWordsFitWidth(pdf, mainTitle, maxWidthMm) {
-  const words = String(mainTitle || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!words.length) return true;
+/** Titolo/sottotitolo: ogni parola e ogni riga devono restare dentro la cornice. */
+function segnatavoloHeaderTextFitsWidth(pdf, text, innerW) {
+  const raw = String(text || "").trim();
+  if (!raw) return true;
   if (typeof pdf.getTextWidth !== "function") return true;
+  const maxW = segnatavoloHeaderTextMaxWidthMm(innerW);
+  const words = raw.split(/\s+/).filter(Boolean);
   for (const word of words) {
-    if (pdf.getTextWidth(word) > maxWidthMm + 0.05) return false;
+    if (segnatavoloPdfTextWidthMm(pdf, word) > maxW) return false;
+  }
+  const lines = segnatavoloSplitTextToSizeByWords(pdf, raw, innerW);
+  for (const line of lines) {
+    if (segnatavoloPdfTextWidthMm(pdf, line) > maxW) return false;
   }
   return true;
+}
+
+function segnatavoloTableTitleWordsFitWidth(pdf, mainTitle, maxWidthMm) {
+  return segnatavoloHeaderTextFitsWidth(pdf, mainTitle, maxWidthMm);
 }
 
 function segnatavoloApplyLinesToTextElement(el, lines) {
@@ -2247,10 +2268,39 @@ function segnatavoloApplyLinesToTextElement(el, lines) {
   if (!list.length) {
     el.textContent = "";
     el.style.whiteSpace = "";
+    el.style.maxWidth = "";
     return;
   }
   el.style.whiteSpace = list.length > 1 ? "pre-line" : "";
   el.textContent = list.join("\n");
+}
+
+/** Anteprima HTML: se il browser misura più largo del PDF, riduce il font finché sta nel box. */
+function segnatavoloFitElementToMaxWidthPx(el, maxWidthPx, minFontPx = 6) {
+  if (!el || !(maxWidthPx > 0)) return;
+  const basePx = parseFloat(el.style.fontSize) || parseFloat(getComputedStyle(el).fontSize) || 12;
+  el.style.maxWidth = `${maxWidthPx}px`;
+  el.style.marginLeft = "auto";
+  el.style.marginRight = "auto";
+  el.style.boxSizing = "border-box";
+  let fs = basePx;
+  for (let i = 0; i < 120 && el.scrollWidth > maxWidthPx + 1 && fs > minFontPx; i++) {
+    fs = Math.max(minFontPx, fs - 0.35);
+    el.style.fontSize = `${fs}px`;
+  }
+}
+
+function segnatavoloScheduleFitHeaderElements(innerW) {
+  const maxPx = segnatavoloMmToCssPx(segnatavoloHeaderTextMaxWidthMm(innerW));
+  const run = () => {
+    document.querySelectorAll(".segnatavolo-preview__title, .pdf-sample-sheet__title").forEach((el) => {
+      segnatavoloFitElementToMaxWidthPx(el, maxPx);
+    });
+    document.querySelectorAll(".segnatavolo-preview__subtitle").forEach((el) => {
+      if (!el.hidden) segnatavoloFitElementToMaxWidthPx(el, maxPx, 5);
+    });
+  };
+  requestAnimationFrame(() => requestAnimationFrame(run));
 }
 
 /** Stesse righe del PDF per titolo/sottotitolo in anteprima HTML. */
@@ -2379,7 +2429,14 @@ function computeSegnatavoloBatchLayout(pdf, tables, settings, theme, W, H) {
     pdf.setFontSize(titleSize);
     for (const table of list) {
       const hp = getSegnatavoloHeaderParts(table, settings);
-      if (!segnatavoloTableTitleWordsFitWidth(pdf, hp.mainTitle, innerW)) return false;
+      if (!segnatavoloHeaderTextFitsWidth(pdf, hp.mainTitle, innerW)) return false;
+      if (hp.subtitle) {
+        pdf.setFont(theme.subFamily, theme.subStyle);
+        pdf.setFontSize(subSize);
+        if (!segnatavoloHeaderTextFitsWidth(pdf, hp.subtitle, innerW)) return false;
+        pdf.setFont(theme.titleFamily, theme.titleStyle);
+        pdf.setFontSize(titleSize);
+      }
       const hh = measureSegnatavoloListHeaderMm(pdf, theme, innerW, hp.mainTitle, hp.subtitle, titleSize, subSize);
       const names = showGuests ? getTableGuestNamesOrdered(table) : [];
       const nh = showGuests ? measureSegnatavoloNamesBlockMm(pdf, theme, innerW, names, bodySize) : 0;
@@ -2395,7 +2452,14 @@ function computeSegnatavoloBatchLayout(pdf, tables, settings, theme, W, H) {
     pdf.setFontSize(titleSize);
     for (const table of list) {
       const hp = getSegnatavoloHeaderParts(table, settings);
-      if (!segnatavoloTableTitleWordsFitWidth(pdf, hp.mainTitle, innerW)) return false;
+      if (!segnatavoloHeaderTextFitsWidth(pdf, hp.mainTitle, innerW)) return false;
+      if (hp.subtitle) {
+        pdf.setFont(theme.subFamily, theme.subStyle);
+        pdf.setFontSize(subSize);
+        if (!segnatavoloHeaderTextFitsWidth(pdf, hp.subtitle, innerW)) return false;
+        pdf.setFont(theme.titleFamily, theme.titleStyle);
+        pdf.setFontSize(titleSize);
+      }
       const hh = measureSegnatavoloHeroHeaderMm(pdf, theme, innerW, hp.mainTitle, hp.subtitle, titleSize, subSize);
       if (hh > contentH - 0.35) return false;
     }
@@ -5027,6 +5091,7 @@ function renderAllSegnatavoloPreviews(theme, pal, previewRatio, batchLayoutOpt) 
     els.segnatavoloPreviewAllList.appendChild(item);
   });
   scheduleFitSegnatavoloStudioSnapPreviews();
+  segnatavoloScheduleFitHeaderElements(innerW);
 }
 
 function renderSegnatavoloControlSample(theme, pal, batchLayoutOpt) {
@@ -5107,6 +5172,7 @@ function renderSegnatavoloControlSample(theme, pal, batchLayoutOpt) {
     els.segnatavoloControlSampleFoot.style.color = rgbToCss(pal.foot);
   }
   scheduleFitSegnatavoloControlSample();
+  segnatavoloScheduleFitHeaderElements(innerW);
 }
 
 function updateSegnatavoloPreview() {
