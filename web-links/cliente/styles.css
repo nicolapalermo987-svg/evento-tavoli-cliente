@@ -2162,13 +2162,18 @@ select:focus {
   font-weight: 700;
   line-height: 1.15;
   margin: 0;
-  word-break: break-word;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .segnatavolo-preview__subtitle {
   font-size: 0.72em;
   margin-top: 0.25em;
   opacity: 0.85;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .segnatavolo-preview__rule {

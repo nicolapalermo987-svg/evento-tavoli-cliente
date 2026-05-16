@@ -2203,16 +2203,87 @@ function segnatavoloTitleLineHeightMm(fontSizePt) {
   return Math.max(5.2, fontSizePt * 0.42);
 }
 
+/** A capo solo tra parole (mai spezzare una parola a metà riga). */
+function segnatavoloSplitTextToSizeByWords(pdf, text, maxWidthMm) {
+  const raw = String(text || "").trim();
+  if (!raw) return [];
+  if (typeof pdf.getTextWidth !== "function") {
+    return pdf.splitTextToSize(raw, maxWidthMm);
+  }
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const trial = current ? `${current} ${word}` : word;
+    if (pdf.getTextWidth(trial) <= maxWidthMm + 0.02) {
+      current = trial;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/** Ogni parola del titolo deve entrare in una riga senza essere spezzata. */
+function segnatavoloTableTitleWordsFitWidth(pdf, mainTitle, maxWidthMm) {
+  const words = String(mainTitle || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return true;
+  if (typeof pdf.getTextWidth !== "function") return true;
+  for (const word of words) {
+    if (pdf.getTextWidth(word) > maxWidthMm + 0.05) return false;
+  }
+  return true;
+}
+
+function segnatavoloApplyLinesToTextElement(el, lines) {
+  if (!el) return;
+  const list = Array.isArray(lines) ? lines.filter((l) => l != null && String(l).length) : [];
+  if (!list.length) {
+    el.textContent = "";
+    el.style.whiteSpace = "";
+    return;
+  }
+  el.style.whiteSpace = list.length > 1 ? "pre-line" : "";
+  el.textContent = list.join("\n");
+}
+
+/** Stesse righe del PDF per titolo/sottotitolo in anteprima HTML. */
+function segnatavoloGetHeaderWrapLines(theme, titleSizePt, subSizePt, mainTitle, subtitle, innerW) {
+  const t = String(mainTitle || "").trim();
+  const s = String(subtitle || "").trim();
+  if (!t && !s) return { titleLines: [], subLines: [] };
+  if (!window.jspdf?.jsPDF || innerW == null) {
+    return { titleLines: t ? [t] : [], subLines: s ? [s] : [] };
+  }
+  const scratch = new window.jspdf.jsPDF({ unit: "mm", format: "a6" });
+  scratch.setFont(theme.titleFamily, theme.titleStyle);
+  scratch.setFontSize(titleSizePt);
+  const titleLines = t ? segnatavoloSplitTextToSizeByWords(scratch, t, innerW) : [];
+  let subLines = [];
+  if (s) {
+    scratch.setFont(theme.subFamily, theme.subStyle);
+    scratch.setFontSize(subSizePt);
+    subLines = segnatavoloSplitTextToSizeByWords(scratch, s, innerW);
+  }
+  return { titleLines, subLines };
+}
+
 function measureSegnatavoloListHeaderMm(pdf, theme, innerW, mainTitle, subtitle, titleSizePt, subSizePt) {
   pdf.setFont(theme.titleFamily, theme.titleStyle);
   pdf.setFontSize(titleSizePt);
-  const titleLines = pdf.splitTextToSize(String(mainTitle || ""), innerW);
+  const titleLines = segnatavoloSplitTextToSizeByWords(pdf, mainTitle, innerW);
   const lhT = segnatavoloTitleLineHeightMm(titleSizePt);
   let h = titleLines.length * lhT;
   if (subtitle) {
     pdf.setFont(theme.subFamily, theme.subStyle);
     pdf.setFontSize(subSizePt);
-    const subLines = pdf.splitTextToSize(String(subtitle), innerW);
+    const subLines = segnatavoloSplitTextToSizeByWords(pdf, subtitle, innerW);
     const lhS = segnatavoloTitleLineHeightMm(subSizePt);
     h += 0.8 + subLines.length * lhS;
   } else {
@@ -2226,13 +2297,13 @@ function measureSegnatavoloListHeaderMm(pdf, theme, innerW, mainTitle, subtitle,
 function measureSegnatavoloHeroHeaderMm(pdf, theme, innerW, mainTitle, subtitle, titleSizePt, subSizePt) {
   pdf.setFont(theme.titleFamily, theme.titleStyle);
   pdf.setFontSize(titleSizePt);
-  const titleLines = pdf.splitTextToSize(String(mainTitle || ""), innerW);
+  const titleLines = segnatavoloSplitTextToSizeByWords(pdf, mainTitle, innerW);
   const lhT = segnatavoloTitleLineHeightMm(titleSizePt);
   let h = titleLines.length * lhT;
   if (subtitle) {
     pdf.setFont(theme.subFamily, theme.subStyle);
     pdf.setFontSize(subSizePt);
-    const subLines = pdf.splitTextToSize(String(subtitle), innerW);
+    const subLines = segnatavoloSplitTextToSizeByWords(pdf, subtitle, innerW);
     const lhS = segnatavoloTitleLineHeightMm(subSizePt);
     h += 1.2 + subLines.length * lhS;
   }
@@ -2304,8 +2375,11 @@ function computeSegnatavoloBatchLayout(pdf, tables, settings, theme, W, H) {
     const titleSize = theme.titleSize * scale;
     const subSize = theme.subSize * scale;
     const bodySize = theme.bodySize * scale;
+    pdf.setFont(theme.titleFamily, theme.titleStyle);
+    pdf.setFontSize(titleSize);
     for (const table of list) {
       const hp = getSegnatavoloHeaderParts(table, settings);
+      if (!segnatavoloTableTitleWordsFitWidth(pdf, hp.mainTitle, innerW)) return false;
       const hh = measureSegnatavoloListHeaderMm(pdf, theme, innerW, hp.mainTitle, hp.subtitle, titleSize, subSize);
       const names = showGuests ? getTableGuestNamesOrdered(table) : [];
       const nh = showGuests ? measureSegnatavoloNamesBlockMm(pdf, theme, innerW, names, bodySize) : 0;
@@ -2317,8 +2391,11 @@ function computeSegnatavoloBatchLayout(pdf, tables, settings, theme, W, H) {
   function fitsHeroScale(scale) {
     const titleSize = theme.titleSize * scale;
     const subSize = theme.subSize * scale;
+    pdf.setFont(theme.titleFamily, theme.titleStyle);
+    pdf.setFontSize(titleSize);
     for (const table of list) {
       const hp = getSegnatavoloHeaderParts(table, settings);
+      if (!segnatavoloTableTitleWordsFitWidth(pdf, hp.mainTitle, innerW)) return false;
       const hh = measureSegnatavoloHeroHeaderMm(pdf, theme, innerW, hp.mainTitle, hp.subtitle, titleSize, subSize);
       if (hh > contentH - 0.35) return false;
     }
@@ -3989,7 +4066,7 @@ function drawSegnatavoloPage(pdf, table, settings) {
       drawPdf.setFont(theme.titleFamily, theme.titleStyle);
       drawPdf.setFontSize(titleSize);
       drawPdf.setTextColor(...palette.title);
-      const titleLines = drawPdf.splitTextToSize(mainTitle, innerW);
+      const titleLines = segnatavoloSplitTextToSizeByWords(drawPdf, mainTitle, innerW);
       for (const line of titleLines) {
         drawPdf.text(line, cx, y, { align: "center" });
         y += titleLineH(titleSize);
@@ -3998,7 +4075,7 @@ function drawSegnatavoloPage(pdf, table, settings) {
         drawPdf.setFont(theme.subFamily, theme.subStyle);
         drawPdf.setFontSize(subSize);
         drawPdf.setTextColor(...palette.subtitle);
-        const subLines = drawPdf.splitTextToSize(subtitle, innerW);
+        const subLines = segnatavoloSplitTextToSizeByWords(drawPdf, subtitle, innerW);
         for (const line of subLines) {
           drawPdf.text(line, cx, y + 0.4, { align: "center" });
           y += titleLineH(subSize);
@@ -4013,7 +4090,7 @@ function drawSegnatavoloPage(pdf, table, settings) {
     drawPdf.setFont(theme.titleFamily, theme.titleStyle);
     drawPdf.setFontSize(titleSize);
     drawPdf.setTextColor(...palette.title);
-    const titleLines = drawPdf.splitTextToSize(mainTitle, innerW);
+    const titleLines = segnatavoloSplitTextToSizeByWords(drawPdf, mainTitle, innerW);
     for (const line of titleLines) {
       drawPdf.text(line, cx, y, { align: "center" });
       y += titleLineH(titleSize);
@@ -4022,7 +4099,7 @@ function drawSegnatavoloPage(pdf, table, settings) {
       drawPdf.setFont(theme.subFamily, theme.subStyle);
       drawPdf.setFontSize(subSize);
       drawPdf.setTextColor(...palette.subtitle);
-      const subLines = drawPdf.splitTextToSize(subtitle, innerW);
+      const subLines = segnatavoloSplitTextToSizeByWords(drawPdf, subtitle, innerW);
       for (const line of subLines) {
         drawPdf.text(line, cx, y + 0.5, { align: "center" });
         y += titleLineH(subSize);
@@ -4843,6 +4920,7 @@ function renderAllSegnatavoloPreviews(theme, pal, previewRatio, batchLayoutOpt) 
   const bodyPx = segnatavoloPdfPtToCssPx(pts.bodyPt);
   const emptyPx = segnatavoloPdfPtToCssPx(pts.emptyBodyPt);
   const footPx = segnatavoloPdfPtToCssPx(pts.footPt);
+  const innerW = batchLayout ? batchLayout.innerW : Math.max(36, paperMmW * (1 - 2 * SEGNATAVOLO_SAFE_MARGIN_FRAC));
 
   ordered.forEach((table) => {
     const item = document.createElement("div");
@@ -4877,14 +4955,22 @@ function renderAllSegnatavoloPreviews(theme, pal, previewRatio, batchLayoutOpt) 
     title.style.fontFamily = theme.previewTitle;
     title.style.fontSize = `${titlePx}px`;
     title.style.color = rgbToCss(pal.title);
-    title.textContent = headers.mainTitle;
+    const wrap = segnatavoloGetHeaderWrapLines(
+      theme,
+      pts.titlePt,
+      pts.subPt,
+      headers.mainTitle,
+      headers.subtitle,
+      innerW
+    );
+    segnatavoloApplyLinesToTextElement(title, wrap.titleLines);
 
     const subtitle = document.createElement("div");
     subtitle.className = "segnatavolo-preview__subtitle";
     subtitle.style.fontFamily = theme.previewBody;
     subtitle.style.fontSize = `${subPx}px`;
     subtitle.style.color = rgbToCss(pal.subtitle);
-    subtitle.textContent = headers.subtitle || "";
+    segnatavoloApplyLinesToTextElement(subtitle, wrap.subLines);
     subtitle.hidden = !headers.subtitle;
 
     if (heroMode) {
@@ -4955,6 +5041,18 @@ function renderSegnatavoloControlSample(theme, pal, batchLayoutOpt) {
   const emptyPx = segnatavoloPdfPtToCssPx(pts.emptyBodyPt);
   const footPx = segnatavoloPdfPtToCssPx(pts.footPt);
   const headers = getSegnatavoloHeaderParts(table);
+  const batchLayout = batchLayoutOpt != null ? batchLayoutOpt : getSegnatavoloLayoutForCurrentState(ordered);
+  const innerW = batchLayout
+    ? batchLayout.innerW
+    : Math.max(36, 148 * (1 - 2 * SEGNATAVOLO_SAFE_MARGIN_FRAC));
+  const wrap = segnatavoloGetHeaderWrapLines(
+    theme,
+    pts.titlePt,
+    pts.subPt,
+    headers.mainTitle,
+    headers.subtitle,
+    innerW
+  );
 
   els.segnatavoloControlSampleCard.style.setProperty("--sample-ratio", String(ratio));
   els.segnatavoloControlSampleCard.style.setProperty("--seg-deco", rgbToCss(pal.deco));
@@ -4963,14 +5061,17 @@ function renderSegnatavoloControlSample(theme, pal, batchLayoutOpt) {
   if (els.segnatavoloControlSampleDeco) applySegnatavoloPreviewDeco(els.segnatavoloControlSampleDeco);
 
   if (els.segnatavoloControlSampleTitle) {
-    els.segnatavoloControlSampleTitle.textContent = headers.mainTitle || "Tavolo 1";
+    segnatavoloApplyLinesToTextElement(
+      els.segnatavoloControlSampleTitle,
+      wrap.titleLines.length ? wrap.titleLines : ["Tavolo 1"]
+    );
     els.segnatavoloControlSampleTitle.style.fontFamily = theme.previewTitle;
     els.segnatavoloControlSampleTitle.style.fontSize = `${titlePx}px`;
     els.segnatavoloControlSampleTitle.style.color = rgbToCss(pal.title);
   }
   if (els.segnatavoloControlSampleSubtitle) {
     els.segnatavoloControlSampleSubtitle.hidden = !headers.subtitle;
-    els.segnatavoloControlSampleSubtitle.textContent = headers.subtitle || "";
+    segnatavoloApplyLinesToTextElement(els.segnatavoloControlSampleSubtitle, wrap.subLines);
     els.segnatavoloControlSampleSubtitle.style.fontFamily = theme.previewBody;
     els.segnatavoloControlSampleSubtitle.style.fontSize = `${subPx}px`;
     els.segnatavoloControlSampleSubtitle.style.color = rgbToCss(pal.subtitle);
@@ -5030,17 +5131,28 @@ function updateSegnatavoloPreview() {
     els.segnatavoloPreview.style.height = `${segnatavoloMmToCssPx(paperH)}px`;
 
     const headers = getSegnatavoloHeaderParts(table);
+    const innerW = batchLayout
+      ? batchLayout.innerW
+      : Math.max(36, paperW * (1 - 2 * SEGNATAVOLO_SAFE_MARGIN_FRAC));
+    const wrap = segnatavoloGetHeaderWrapLines(
+      theme,
+      pts.titlePt,
+      pts.subPt,
+      headers.mainTitle,
+      headers.subtitle,
+      innerW
+    );
     els.segnatavoloPreviewTitle.style.fontFamily = theme.previewTitle;
     els.segnatavoloPreviewTitle.style.fontSize = `${titlePx}px`;
     els.segnatavoloPreviewTitle.style.color = rgbToCss(pal.title);
-    els.segnatavoloPreviewTitle.textContent = headers.mainTitle;
+    segnatavoloApplyLinesToTextElement(els.segnatavoloPreviewTitle, wrap.titleLines);
 
     if (headers.subtitle) {
       els.segnatavoloPreviewSubtitle.hidden = false;
       els.segnatavoloPreviewSubtitle.style.fontFamily = theme.previewBody;
       els.segnatavoloPreviewSubtitle.style.fontSize = `${subPx}px`;
       els.segnatavoloPreviewSubtitle.style.color = rgbToCss(pal.subtitle);
-      els.segnatavoloPreviewSubtitle.textContent = headers.subtitle;
+      segnatavoloApplyLinesToTextElement(els.segnatavoloPreviewSubtitle, wrap.subLines);
     } else {
       els.segnatavoloPreviewSubtitle.hidden = true;
     }
